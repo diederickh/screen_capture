@@ -67,7 +67,7 @@ int main() {
   sc::Settings cfg;
   sc::ScreenCaptureGL cap;
   
-  cfg.display = 1;
+  cfg.display = 0;
   cfg.pixel_format = SC_BGRA;
   cfg.output_width = 1280;
   cfg.output_height = 720;
