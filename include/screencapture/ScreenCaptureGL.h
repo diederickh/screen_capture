@@ -77,7 +77,7 @@ namespace sc {
     "uniform mat4 u_vm;"
     "uniform float u_texcoords[8]; "
     ""
-#if 0    
+#if 1    
     "const vec2 pos[4] = vec2[4]("
     "  vec2(0.0,  1.0), "
     "  vec2(0.0,  0.0), "
@@ -96,7 +96,7 @@ namespace sc {
     "out vec2 v_tex; "
     ""
     "void main() { "
-#if 0    
+#if 1    
     "  gl_Position = u_pm * u_vm * vec4(pos[gl_VertexID], 0.0, 1.0);"
     "  gl_Position.z = 1.0;"
 #else
