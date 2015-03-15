@@ -77,32 +77,19 @@ namespace sc {
     "uniform mat4 u_vm;"
     "uniform float u_texcoords[8]; "
     ""
-#if 1    
     "const vec2 pos[4] = vec2[4]("
     "  vec2(0.0,  1.0), "
     "  vec2(0.0,  0.0), "
     "  vec2(1.0,  1.0), "
     "  vec2(1.0,  0.0)  "
     ");"
-#else
-    "const vec2 pos[4] = vec2[4]("
-    "  vec2(-1.0,  1.0), "
-    "  vec2(-1.0,  -1.0), "
-    "  vec2(1.0,  1.0), "
-    "  vec2(1.0,  -1.0)  "
-    ");"
-#endif
     ""
     "out vec2 v_tex; "
     ""
     "void main() { "
-#if 1    
     "  gl_Position = u_pm * u_vm * vec4(pos[gl_VertexID], 0.0, 1.0);"
-    "  gl_Position.z = 1.0;"
-#else
-    "  gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);"
-#endif
-    "  v_tex = vec2(u_texcoords[gl_VertexID * 2], u_texcoords[gl_VertexID * 2 + 1]);"
+    "  gl_Position.z = 1.0;" /* Make sure it's always drawn, @todo will be removed at some point. */
+    "  v_tex = vec2(u_texcoords[gl_VertexID * 2], u_texcoords[(gl_VertexID * 2) + 1]);"
     "}"
     "";
 
@@ -527,12 +514,11 @@ namespace sc {
     glUseProgram(prog);
     glBindVertexArray(vao);
     glUniformMatrix4fv(u_vm, 1, GL_FALSE, vm);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 6);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
   }
 
   int ScreenCaptureGL::flip(bool horizontal, bool vertical) {
 
-    int dx = 0;
     float* texcoords = NULL;
     float tex_normal[] =     { 0.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0 } ;
     float tex_vert[] =       { 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0 } ;
