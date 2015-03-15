@@ -85,7 +85,7 @@ namespace sc {
     Settings();
     
   public:
-    int display;                                                 /* The display number which is shown when you call `listDisplays()`. */
+    int display;                                                 /* The display number which is shown when you call `listDisplays()`. This is an index into the displays vector you get from `getDisplays()`. */
     int pixel_format;                                            /* The pixel format that you want to use when capturing. */
     int output_width;                                            /* The width for the buffer you'll receive. */
     int output_height;                                           /* The height fr the buffer you'll receive. */

@@ -77,17 +77,31 @@ namespace sc {
     "uniform mat4 u_vm;"
     "uniform float u_texcoords[8]; "
     ""
+#if 0    
     "const vec2 pos[4] = vec2[4]("
     "  vec2(0.0,  1.0), "
     "  vec2(0.0,  0.0), "
     "  vec2(1.0,  1.0), "
     "  vec2(1.0,  0.0)  "
     ");"
+#else
+    "const vec2 pos[4] = vec2[4]("
+    "  vec2(-1.0,  1.0), "
+    "  vec2(-1.0,  -1.0), "
+    "  vec2(1.0,  1.0), "
+    "  vec2(1.0,  -1.0)  "
+    ");"
+#endif
     ""
     "out vec2 v_tex; "
     ""
     "void main() { "
+#if 0    
     "  gl_Position = u_pm * u_vm * vec4(pos[gl_VertexID], 0.0, 1.0);"
+    "  gl_Position.z = 1.0;"
+#else
+    "  gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);"
+#endif
     "  v_tex = vec2(u_texcoords[gl_VertexID * 2], u_texcoords[gl_VertexID * 2 + 1]);"
     "}"
     "";
@@ -144,6 +158,8 @@ namespace sc {
     void draw();                                                                 /* Draw the captured screen using at 0, 0 using the provided output_width and output_height of the settings youpassed into configure.*/
     void draw(float x, float y, float w, float h);                               /* Draw the captured screen at the given location. */
     int flip(bool horizontal, bool vertical);                                    /* Flip the screen horizontally or vertically according to Photoshops flip feature. */
+
+    int setProjectionMatrix(float* projection); 
     
   private:
     int setupGraphics();                                                         /* Used internally to create the shaders when they're not yet created, calls `setupShaders()` and `setupTextures()`. */
@@ -180,6 +196,27 @@ namespace sc {
     return cap.stop();
   }
 
+  inline int ScreenCaptureGL::setProjectionMatrix(float* projection) {
+
+#if !defined(NDEBUG)
+    if (0 == prog) {
+      printf("Error: can only set the projection matrix of the ScreenCaptureGL after it's initialized and configured.\n");
+      return -1;
+    }
+#endif    
+    
+    if (NULL == projection) {
+      printf("Error: trying to set the projection matrix, but you've passed a NULL pointer.\n");
+      return -2;
+    }
+
+    memcpy(pm, projection, sizeof(pm));
+
+    glUseProgram(prog);
+    glUniformMatrix4fv(u_pm, 1, GL_FALSE, pm);
+
+    return 0;
+  }
 
 } /* namespace sc */
 #endif

@@ -57,6 +57,7 @@ if (APPLE)
 endif()
 
 add_library(screencapture${debug_flag} ${screencapture_lib_sources})
+install(TARGETS screencapture${debug_flag} ARCHIVE DESTINATION lib)
 
 macro(create_test name fname)
   set(test_name "test_${name}${debug_flag}")
