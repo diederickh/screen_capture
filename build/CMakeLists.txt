@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
-project(screen_capture)
+project(screencapture)
 
 message(STATUS "EXTERN_LIB_DIR: ${EXTERN_LIB_DIR}")
 message(STATUS "EXTERN_INC_DIR: ${EXTERN_INC_DIR}")

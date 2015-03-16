@@ -146,7 +146,9 @@ namespace sc {
     void draw(float x, float y, float w, float h);                               /* Draw the captured screen at the given location. */
     int flip(bool horizontal, bool vertical);                                    /* Flip the screen horizontally or vertically according to Photoshops flip feature. */
 
-    int setProjectionMatrix(float* projection); 
+    int setProjectionMatrix(float* projection);
+    int lock();                                                                 /* Whenever you want to access the `pixels` member you need to lock first. */
+    int unlock();                                                               /* Unlock when you're ready witht eh `pixels` member. */
     
   private:
     int setupGraphics();                                                         /* Used internally to create the shaders when they're not yet created, calls `setupShaders()` and `setupTextures()`. */
@@ -181,6 +183,26 @@ namespace sc {
 
   inline int ScreenCaptureGL::stop() {
     return cap.stop();
+  }
+
+  inline int ScreenCaptureGL::lock() {
+    
+    if (0 != sc_gl_lock_mutex(mutex)) {
+      printf("Error: failed to lock the mutex in ScreenCaptureGL.\n");
+      return -1;
+    }
+
+    return 0;
+  }
+
+  inline int ScreenCaptureGL::unlock() {
+    
+    if (0 != sc_gl_unlock_mutex(mutex)) {
+      printf("Error: failed to unlock the mutex in ScreenCaptureGL.\n");
+      return -1;
+    }
+
+    return 0;
   }
 
   inline int ScreenCaptureGL::setProjectionMatrix(float* projection) {
@@ -362,7 +384,8 @@ namespace sc {
     }
 
     create_identity_matrix(vm);
-    
+
+    /* We should store the flip as state, not in the global shader. */
     if (0 != flip(false, true)) {
       /* @todo - we should remove all GL objects here. */
       return -3;
@@ -445,12 +468,14 @@ namespace sc {
       return -2;
     }
 
+    if (0 != tex0) {
+      /* @todo we could delete the current texture. */
+      printf("Error: trying to setup the textures, but it seems that the texture is already created.\n");
+      return -3;
+    }
+
     if (SC_BGRA == settings.pixel_format) {
 
-      if (0 != tex0) {
-        printf("Error: trying to setup the textures, but it seems that the texture is already created.\n");
-        return -3;
-      }
 
       glGenTextures(1, &tex0);
       glBindTexture(GL_TEXTURE_2D, tex0);
@@ -470,7 +495,7 @@ namespace sc {
 
   void ScreenCaptureGL::update() {
     
-    sc_gl_lock_mutex(mutex);
+    lock();
     {
       if (true == has_new_frame) {
         glBindTexture(GL_TEXTURE_2D, tex0);
@@ -478,7 +503,8 @@ namespace sc {
         has_new_frame = false;
       }
     }
-    sc_gl_unlock_mutex(mutex);
+    unlock();
+
   }
 
   void ScreenCaptureGL::draw() {
@@ -794,12 +820,12 @@ namespace sc {
         return;
       }
       
-      sc_gl_lock_mutex(gl->mutex);
+      gl->lock();
       {
         memcpy(gl->pixels, buffer.plane[0], buffer.nbytes[0]);
         gl->has_new_frame = true;
       }
-      sc_gl_unlock_mutex(gl->mutex);
+      gl->unlock();
     }
 
   }
