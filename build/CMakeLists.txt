@@ -53,21 +53,37 @@ if (APPLE)
     ${EXTERN_LIB_DIR}/libz.a
     ${EXTERN_LIB_DIR}/libglfw3.a
     )
-  
+elseif(WIN32)
+  find_library(lib_dxgi dxgi.lib)
+  find_path(d3d Include/d3d10.h)
+  message(STATUS ">>>>>>>>>>> ${lib_dxgi} <<<<<<<<")
+  message(STATUS ">>>>>>>>>>> ${d3d} <<<<<<<<")
+  set(app_libs
+    dxgi.lib
+    d3d11.lib
+    ${EXTERN_LIB_DIR}/libpng16_static.lib
+    ${EXTERN_LIB_DIR}/zlibstatic.lib
+    )
 endif()
 
-add_library(screencapture${debug_flag} ${screencapture_lib_sources})
-install(TARGETS screencapture${debug_flag} ARCHIVE DESTINATION lib)
+#add_library(screencapture${debug_flag} ${screencapture_lib_sources})
+#install(TARGETS screencapture${debug_flag} ARCHIVE DESTINATION lib)
 
 macro(create_test name fname)
   set(test_name "test_${name}${debug_flag}")
   add_executable(${test_name}  ${sd}/test/test_${fname})
+if (APPLE)
   target_link_libraries(${test_name} screencapture${debug_flag} ${app_libs})
-  install(TARGETS ${test_name} DESTINATION bin/)
   add_dependencies(${test_name} screencapture${debug_flag})
+else()
+  target_link_libraries(${test_name} ${app_libs})
+endif()
+  install(TARGETS ${test_name} DESTINATION bin/)
+
 endmacro()
 
-create_test(mac_api_research "mac_api_research.m")
-create_test(mac_screencapture_console "mac_screencapture_console.cpp")
-create_test(opengl "opengl.cpp;${EXTERN_SRC_DIR}/glad.c")
-create_test(math "math.cpp")
+#create_test(mac_api_research "mac_api_research.m")
+#create_test(mac_screencapture_console "mac_screencapture_console.cpp")
+#create_test(opengl "opengl.cpp;${EXTERN_SRC_DIR}/glad.c")
+#create_test(math "math.cpp")
+create_test(win_api_directx_research "win_api_directx_research.cpp")
