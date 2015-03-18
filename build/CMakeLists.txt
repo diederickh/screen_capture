@@ -61,6 +61,7 @@ elseif(WIN32)
   set(app_libs
     dxgi.lib
     d3d11.lib
+    d3dcompiler.lib
     ${EXTERN_LIB_DIR}/libpng16_static.lib
     ${EXTERN_LIB_DIR}/zlibstatic.lib
     )
@@ -69,9 +70,9 @@ endif()
 #add_library(screencapture${debug_flag} ${screencapture_lib_sources})
 #install(TARGETS screencapture${debug_flag} ARCHIVE DESTINATION lib)
 
-macro(create_test name fname)
+macro(create_test name fname params)
   set(test_name "test_${name}${debug_flag}")
-  add_executable(${test_name}  ${sd}/test/test_${fname})
+  add_executable(${test_name} ${params} ${sd}/test/test_${fname})
 if (APPLE)
   target_link_libraries(${test_name} screencapture${debug_flag} ${app_libs})
   add_dependencies(${test_name} screencapture${debug_flag})
@@ -86,4 +87,6 @@ endmacro()
 #create_test(mac_screencapture_console "mac_screencapture_console.cpp")
 #create_test(opengl "opengl.cpp;${EXTERN_SRC_DIR}/glad.c")
 #create_test(math "math.cpp")
-create_test(win_api_directx_research "win_api_directx_research.cpp")
+#create_test(win_api_directx_research "win_api_directx_research.cpp")
+create_test(win_directx "win_directx.cpp" WIN32)
+#install(FILES ${sd}/test/test_win_directx_shader.hlsl DESTINATION bin)

@@ -54,5 +54,6 @@ cd ${install_path}/bin
 #${debugger} ./test_mac_screencapture_console${debug_flag}
 #${debugger} ./test_mac_api_research${debug_flag}
 #${debugger} ./test_opengl${debug_flag}
-${debugger} ./test_win_api_directx_research${debug_flag}
+#${debugger} ./test_win_api_directx_research${debug_flag}
+${debugger} ./test_win_directx${debug_flag}
 
