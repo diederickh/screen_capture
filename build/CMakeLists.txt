@@ -57,6 +57,7 @@ elseif(WIN32)
 
   list(APPEND screencapture_lib_sources
     ${sd}/win/ScreenCaptureDuplicateOutputDirect3D11.cpp
+    ${sd}/win/ScreenCaptureScaleAndColorTransformDirect3D11.cpp
     )
   
   find_library(lib_dxgi dxgi.lib)

@@ -169,11 +169,27 @@ namespace sc {
       shutdown();
       return -9;
     }
+
+    ScaleAndTransformSettingsD3D11 trans_cfg;
+    trans_cfg.device = device;
+    trans_cfg.context = context;
+    
+    if (0 != transform.init(trans_cfg)) {
+      printf("Error: failed to initialize the tansform for the screen capture.\n");
+      shutdown();
+      return -9;
+    }
     
     return 0;
   } /* init */
 
   int ScreenCaptureDuplicateOutputDirect3D11::shutdown() {
+
+    int r = 0;
+
+    if (0 != transform.shutdown()) {
+      r -= 1;
+    }
 
     if (NULL != factory) {
       factory->Release();
