@@ -35,6 +35,16 @@ int main() {
   if (0 != capture.configure(settings)) {
     exit(EXIT_FAILURE);
   }
+
+  if (0 != capture.start()) {
+    exit(EXIT_FAILURE);
+  }
+
+  while (true) {
+    capture.update();
+  }
+
+  capture.shutdown();
   
   return 0;
 }

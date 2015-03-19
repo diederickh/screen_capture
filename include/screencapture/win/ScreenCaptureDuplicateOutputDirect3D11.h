@@ -48,6 +48,7 @@ namespace sc {
     IDXGIOutputDuplication* duplication;             /* The duplication object, set in configure(). */
     DXGI_OUTDUPL_FRAME_INFO frame_info;              /* Information about the frame, in update(). */
     IDXGIResource* frame;                            /* The captured frame, in update(). */
+    bool has_frame;                                  /* Is set to true when we acquired a next frame in Release(). According to the docs it's best to keep access to the required frame and release it just before calling AcquireNextFrame(). See the remarks here https://msdn.microsoft.com/en-us/library/windows/desktop/hh404623(v=vs.85).aspx */
     std::vector<IDXGIAdapter1*> adapters;            /* An adapter represents a video card. We use it to retrieve the attached outputs (displays). */
     std::vector<IDXGIOutput*> outputs;               /* The outputs we retrieved in init(). An IDXGIOutput represents an display/monitor. */
     std::vector<sc::Display*> displays;              /* We collect the displays in init(). */

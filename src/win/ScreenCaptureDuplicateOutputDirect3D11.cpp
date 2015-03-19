@@ -171,7 +171,7 @@ namespace sc {
     }
     
     return 0;
-  }
+  } /* init */
 
   int ScreenCaptureDuplicateOutputDirect3D11::shutdown() {
 
@@ -291,6 +291,18 @@ namespace sc {
        need to change some stuff. Here I check if the mem is on GPU. */
     
     DXGI_OUTDUPL_DESC duplication_desc;
+    duplication->GetDesc(&duplication_desc);
+
+    if (TRUE == duplication_desc.DesktopImageInSystemMemory) {
+      printf("Error: the desktop image is already in system memory; this is something we still need to implement.\n");
+      output->Release();
+      output = NULL;
+
+      duplication->Release();
+      duplication = NULL;
+      return -8;
+    }
+    
     return 0;
   }
 
@@ -299,7 +311,70 @@ namespace sc {
   }
 
   void ScreenCaptureDuplicateOutputDirect3D11::update() {
+
+    HRESULT hr = E_FAIL;
     
+#if !defined(NDEBUG)
+    if (NULL == duplication) {
+      printf("Error: duplication is NULL in ScreenCaptureDuplicateOutputDirect3D11().\n");
+      return;
+    }
+#endif
+
+    /*
+      According to the remarks here: https://msdn.microsoft.com/en-us/library/windows/desktop/hh404623(v=vs.85).aspx
+      we should release the frame just before calling AcquireNextFrame(). When we keep access of the 
+      frame (by NOT calling ReleaseFrame as long as possible), the OS won't copy all changes all the time.
+      
+      @todo we need to check if this really improves performance :) 
+
+    */
+    if (has_frame) {
+
+      hr = duplication->ReleaseFrame();
+      
+      if (S_OK != hr) {
+        printf("Error: failed to release the duplicated frame.\n");
+      }
+      
+      has_frame = false;
+    }
+
+    hr = duplication->AcquireNextFrame(0, &frame_info, &frame);
+
+    if (S_OK == hr) {
+      
+      /* Got a frame. */
+      printf("- Got a frame.\n");
+
+      /* @todo this is where we render the texture in the 'frame' into our target view. */
+      
+      has_frame = true;
+
+      if (NULL != frame) {
+        frame->Release();
+        frame = NULL;
+      }
+    }
+    else if (DXGI_ERROR_WAIT_TIMEOUT == hr) {
+      /* Because our interval is 0 we may get a timeout often. */
+
+    }
+    else if (DXGI_ERROR_ACCESS_LOST == hr) {
+      printf("Error: Access to the desktop duplication was lost. We need to handle this situation\n");
+      /* See: https://msdn.microsoft.com/en-us/library/windows/desktop/hh404615(v=vs.85).aspx */
+    }
+#if !defined(NDEBUG)    
+    else if (DXGI_ERROR_INVALID_CALL == hr) {
+      printf("Error: not supposed to happen but the call for AcquireNextFrame() failed.\n");
+
+    }
+#endif
+    else {
+      printf("Warning: unhandled return of AcquireNextFrame().\n");
+    }
+
+
   }
 
   int ScreenCaptureDuplicateOutputDirect3D11::stop() {

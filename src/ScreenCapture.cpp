@@ -212,6 +212,16 @@ namespace sc {
     return 0;
   }
 
+  void ScreenCapture::update() {
+    
+#if !defined(NDEBUG)
+    printf("Error: trying to update the screencapturer, but we're not initialized; no implementation was allocated.\n");
+    exit(EXIT_FAILURE);
+#endif
+    
+    impl->update();
+  }
+
   int ScreenCapture::stop() {
 
     int r = 0;

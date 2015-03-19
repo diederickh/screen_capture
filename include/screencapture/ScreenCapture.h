@@ -90,6 +90,7 @@ namespace sc {
     /* Control */
     int configure(Settings settings);                                                                   /* Before you can use the screencapturer you must configure it. See the examples in `test/.cpp` and Types.h for the available settings. */
     int start();                                                                                        /* Start capturing. You can use start/stop() multiple times. */
+    void update();
     int stop();                                                                                         /* Stop capturing. */
 
     /* Features. */
