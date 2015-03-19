@@ -11,6 +11,10 @@ namespace sc {
     if (NULL == impl && SC_DISPLAY_STREAM == driver) {
       impl = new ScreenCaptureDisplayStream();
     }
+#elif defined(_WIN32)
+    if (NULL == impl && SC_DUPLICATE_OUTPUT_DIRECT3D11 == driver) {
+      impl = new ScreenCaptureDuplicateOutputDirect3D11();
+    }
 #endif
 
     if (NULL == impl) {

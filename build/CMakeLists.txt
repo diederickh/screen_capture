@@ -54,10 +54,14 @@ if (APPLE)
     ${EXTERN_LIB_DIR}/libglfw3.a
     )
 elseif(WIN32)
+
+  list(APPEND screencapture_lib_sources
+    ${sd}/win/ScreenCaptureDuplicateOutputDirect3D11.cpp
+    )
+  
   find_library(lib_dxgi dxgi.lib)
   find_path(d3d Include/d3d10.h)
-  message(STATUS ">>>>>>>>>>> ${lib_dxgi} <<<<<<<<")
-  message(STATUS ">>>>>>>>>>> ${d3d} <<<<<<<<")
+
   set(app_libs
     dxgi.lib
     d3d11.lib
@@ -67,7 +71,7 @@ elseif(WIN32)
     )
 endif()
 
-#add_library(screencapture${debug_flag} ${screencapture_lib_sources})
+add_library(screencapture${debug_flag} ${screencapture_lib_sources})
 #install(TARGETS screencapture${debug_flag} ARCHIVE DESTINATION lib)
 
 macro(create_test name fname params)
@@ -77,10 +81,9 @@ if (APPLE)
   target_link_libraries(${test_name} screencapture${debug_flag} ${app_libs})
   add_dependencies(${test_name} screencapture${debug_flag})
 else()
-  target_link_libraries(${test_name} ${app_libs})
+  target_link_libraries(${test_name} ${app_libs} screencapture${debug_flag})
 endif()
   install(TARGETS ${test_name} DESTINATION bin/)
-
 endmacro()
 
 #create_test(mac_api_research "mac_api_research.m")
@@ -88,5 +91,6 @@ endmacro()
 #create_test(opengl "opengl.cpp;${EXTERN_SRC_DIR}/glad.c")
 #create_test(math "math.cpp")
 #create_test(win_api_directx_research "win_api_directx_research.cpp")
-create_test(win_directx "win_directx.cpp" WIN32)
-#install(FILES ${sd}/test/test_win_directx_shader.hlsl DESTINATION bin)
+#create_test(win_directx "win_directx.cpp" WIN32)
+create_test(api "api.cpp" "")
+#install(FILES ${sd}/test/test_win_directx_shader.hlsl DESTINATION bin)install(FILES ${sd}/test/test_win_directx_shader.hlsl DESTINATION bin)

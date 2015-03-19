@@ -28,9 +28,12 @@
 
 /* Screen Capture Drivers */
 #define SC_DISPLAY_STREAM 1
+#define SC_DUPLICATE_OUTPUT_DIRECT3D11 2
 
 #if defined (__APPLE__)
 #  define SC_DEFAULT_DRIVER SC_DISPLAY_STREAM
+#elif defined(_WIN32)
+#  define SC_DEFAULT_DRIVER SC_DUPLICATE_OUTPUT_DIRECT3D11
 #endif
 
 /* General "Unset" value */

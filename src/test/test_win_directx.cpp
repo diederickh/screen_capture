@@ -30,6 +30,8 @@
     special meaning. All System-Value semantics begin with a SV_ prefix, such as 
     SV_Position.  The SV_Position is associated with a float4 from the vertex shader
     with a homogeneous clip-space position.
+  - D3DCompileFromFile(), creates a shader from a file ;P
+  - D3DXCompileShader(), creates from source string.
     
 
   References:
@@ -47,9 +49,10 @@
 #include <windows.h>
 #include <D3D11.h>
 #include <D3Dcompiler.h>
-//#include <D3DX11asynch.h>
-//#include <D3DX11async.h>
-//#include <D3dx9math.h>
+
+#define ROXLU_USE_PNG
+#define ROXLU_IMPLEMENTATION
+#include <tinylib.h>
 
 
 /* ------------------------------------------------------------------------------------------------ */
@@ -63,6 +66,15 @@ ID3D11VertexShader* d3d_vs = NULL; /* The vertex shader. */
 ID3D11PixelShader* d3d_ps = NULL;  /* The pixel shader. */
 ID3D11InputLayout* d3d_vertex_layout = NULL; /* Vertex buffer layout. */
 ID3D11Buffer* d3d_buffer = NULL; /* Vertex Buffer. */
+ID3D11Texture2D* d3d_source_tex = NULL; /* The source texture we load from disk. */
+ID3D11ShaderResourceView* d3d_source_tex_resview = NULL; /* Shader-Resource view for accessing the 'd3d_source_tex'. */
+ID3D11Texture2D* d3d_dest_tex = NULL; /* The destination texture onto which we render the source texture. */
+ID3D11RenderTargetView* d3d_dest_targetview = NULL;
+ID3D11ShaderResourceView* d3d_dest_tex_resview = NULL;
+ID3D11SamplerState* d3d_linear_sampler = NULL; /* Sampler for the texture. */
+int dest_width = 320; /* Width of destination texture into which we render. */
+int dest_height = 180; /* Height of destination texture into which we render. */
+
 /* ------------------------------------------------------------------------------------------------ */
 std::ofstream logfile;
 void log(const std::string msg);
@@ -71,6 +83,8 @@ void log(const std::string msg);
 LRESULT CALLBACK WindowProc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam);
 HRESULT initDirect3D(HWND wnd);
 HRESULT initPipeline();
+HRESULT initSourceTexture(); /* Loads the source texture from disk and create the texture object. */
+HRESULT initDestinationTexture(); /* Sets up the destination texture into which we render. */
 void renderFrame();
 HRESULT shutdownDirect3D();
 std::string hresult_to_string(HRESULT hr);
@@ -148,10 +162,22 @@ int WINAPI WinMain(HINSTANCE hInstance,
 
   printf("Lets init the pipeline.\n");
 
-  if (S_OK != initPipeline()) {
-    printf("Error: failed to init the pipeline.\n");
+  if (S_OK != initSourceTexture()) {
+    log("Error: failed to load the source texture.");
     exit(EXIT_FAILURE);
   }
+
+  if (S_OK != initDestinationTexture()) {
+    log("Error: failed to create the destination texture.");
+    exit(EXIT_FAILURE);
+  }
+
+  if (S_OK != initPipeline()) {
+    log("Error: failed to init the pipeline.");
+    exit(EXIT_FAILURE);
+  }
+
+  
 
   /* Main loop. */
   MSG msg;
@@ -270,6 +296,160 @@ HRESULT initDirect3D(HWND wnd) {
   return S_OK;
 }
 
+
+HRESULT initSourceTexture() {
+
+  unsigned char* pixels = NULL;
+  int width = 0;
+  int height = 0;
+  int channels = 0;
+  int allocated = 0;
+  
+  if (rx_load_png("texture.png", &pixels, width, height, channels, &allocated, RX_FLAG_LOAD_AS_RGBA) < 0) {
+    log("Error: failed to load texture.png");
+    return E_FAIL;
+  }
+
+  if (0 == width) {
+    log("Error: the loaded texture has an invalid width.");
+    return E_FAIL;
+  }
+
+  if (0 == height) {
+    log("Error: the loaded texture has an invalid height.");
+    return E_FAIL;
+  }
+
+  if (NULL == pixels) {
+    log("Error: failed to load the texture; pixels is NULL");
+    return E_FAIL;
+  }
+
+  log("Info: Loaded the texture source.");
+  D3D11_TEXTURE2D_DESC desc;
+  ZeroMemory(&desc, sizeof(desc));
+  desc.Width = width;
+  desc.Height = height;
+  desc.MipLevels = 1;
+  desc.ArraySize = 1;
+  desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  desc.SampleDesc.Count = 1;
+  desc.SampleDesc.Quality = 0;
+  desc.Usage = D3D11_USAGE_DEFAULT;
+  desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+  desc.CPUAccessFlags = 0;
+  desc.MiscFlags = 0;
+
+  D3D11_SUBRESOURCE_DATA data;
+  ZeroMemory(&data, sizeof(data));
+  data.pSysMem = pixels;
+  data.SysMemPitch = width * 4;
+  data.SysMemSlicePitch = 0; /* Only used for 3D texture data. */
+
+  HRESULT hr = d3d_device->CreateTexture2D(&desc, &data, &d3d_source_tex);
+  if (S_OK != hr) {
+    log("Erorr: failed to create the source texture from our desc/data.");
+    return hr;
+  }
+
+  D3D11_SHADER_RESOURCE_VIEW_DESC res_desc;
+  ZeroMemory(&res_desc, sizeof(res_desc));
+  res_desc.Format = desc.Format;
+  res_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+  res_desc.Texture2D.MipLevels = desc.MipLevels;
+  
+  hr = d3d_device->CreateShaderResourceView(d3d_source_tex, &res_desc, &d3d_source_tex_resview);
+  if (S_OK != hr) {
+    log("Error: failed to create the resource view for the source texture.");
+    log(hresult_to_string(hr));
+    return hr;
+  }
+
+  /* Create the sampler. */
+  D3D11_SAMPLER_DESC sam_desc;
+  ZeroMemory(&sam_desc, sizeof(sam_desc));
+  sam_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+  sam_desc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+  sam_desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+  sam_desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+  sam_desc.ComparisonFunc = D3D11_COMPARISON_NEVER;
+  sam_desc.MinLOD = 0;
+  sam_desc.MaxLOD = D3D11_FLOAT32_MAX;
+
+  hr = d3d_device->CreateSamplerState(&sam_desc, &d3d_linear_sampler);
+  if (S_OK != hr) {
+    log("Error: failed to create the linear sampler.");
+    return hr;
+  }
+  
+  return S_OK;
+}
+
+HRESULT initDestinationTexture() {
+
+  HRESULT hr;
+  
+  /* Create the destination texture. */
+  {
+    D3D11_TEXTURE2D_DESC desc;
+    ZeroMemory(&desc, sizeof(desc));
+
+    desc.Width = dest_width;
+    desc.Height = dest_height;
+    desc.MipLevels = 1;
+    desc.ArraySize = 1;
+    desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // DXGI_FORMAT_R32G32B32_FLOAT; /* @todo what format is best to use? */
+    desc.SampleDesc.Count = 1;
+    desc.SampleDesc.Quality = 0;
+    desc.Usage = D3D11_USAGE_DEFAULT;
+    desc.BindFlags = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+    desc.CPUAccessFlags = 0;
+    desc.MiscFlags = 0;
+
+    hr = d3d_device->CreateTexture2D(&desc, NULL, &d3d_dest_tex);
+    if (S_OK != hr) {
+      log("Error: failed to create the render target texture.");
+      log(hresult_to_string(hr));
+      return hr;
+    }
+  }
+
+  /* Create the render target. */
+  {
+    D3D11_RENDER_TARGET_VIEW_DESC desc;
+    ZeroMemory(&desc, sizeof(desc));
+
+    desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // DXGI_FORMAT_R32G32B32_FLOAT; /* @todo what format is best to use? */
+    desc.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+    desc.Texture2D.MipSlice = 0;
+
+    hr = d3d_device->CreateRenderTargetView(d3d_dest_tex, &desc, &d3d_dest_targetview);
+    if (S_OK != hr) {
+      log("Error: failed to create the render target view for the RTT pass.");
+      return hr;
+    }
+  }
+
+  /* Create the Shader Resource View */
+  {
+    D3D11_SHADER_RESOURCE_VIEW_DESC desc;
+    ZeroMemory(&desc, sizeof(desc));
+    desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM; // DXGI_FORMAT_R32G32B32_FLOAT; /* @todo what format is best to use? */
+    desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+    desc.Texture2D.MostDetailedMip = 0;
+    desc.Texture2D.MipLevels = 1;
+
+    hr = d3d_device->CreateShaderResourceView(d3d_dest_tex, &desc, &d3d_dest_tex_resview);
+    if (S_OK != hr) {
+      log("Error: failed to create the shader resource view for the RTT pass.");
+      return hr;
+    }
+  }
+
+  log("Info: created the destination texture.");
+  return S_OK;
+}
+
 HRESULT initPipeline() {
   
   HRESULT hr = S_OK;
@@ -291,7 +471,11 @@ HRESULT initPipeline() {
     log("Error: failed to compile the vertex shader.");
     log(hresult_to_string(hr));
     if (NULL != vs_err) {
-      log("But we have erorrs..");
+      log("But we have errors..");
+      UINT nbytes = vs_err->GetBufferSize();
+      char* err_msg = (char*)vs_err->GetBufferPointer();
+      std::string err_str(err_msg, nbytes);
+      log(err_str);
       vs_err->Release();
       vs_err = NULL;
     }
@@ -322,7 +506,8 @@ HRESULT initPipeline() {
 
   /* Define the layout. */
   D3D11_INPUT_ELEMENT_DESC layout[] = {
-    { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+    { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+    { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
   };
   
   UINT num_els = ARRAYSIZE(layout);
@@ -340,14 +525,17 @@ HRESULT initPipeline() {
 
   /* Create the vertex buffer. */
   float vertices[] = {
-    0.0f, 0.5f, 0.5f,
-    0.5f, -0.5f, 0.5f,
-    -0.5f, -0.5f, 0.5f
+    -1.0f, -1.0f, 0.5f,  0.0f, 0.0f,   /* bottom left */
+    -1.0f,  1.0f, 0.5f,  0.0f, 1.0f,   /* top left */
+     1.0f, -1.0f, 0.5f,  1.0f, 0.0f,   /* bottom right */
+     1.0f,  1.0f, 0.5f,  1.0f, 1.0f    /* top right */
   };
+  
+  int num_floats = 20;
 
   D3D11_BUFFER_DESC bd;
   ZeroMemory(&bd, sizeof(bd));
-  bd.ByteWidth = sizeof(float) * 9;
+  bd.ByteWidth = sizeof(float) * num_floats;
   bd.Usage = D3D11_USAGE_DEFAULT;
   bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
   bd.CPUAccessFlags = 0;
@@ -362,19 +550,19 @@ HRESULT initPipeline() {
 
   hr = d3d_device->CreateBuffer(&bd, &init_data, &d3d_buffer);
   if (S_OK != hr) {
-    log("Failed to create the vertex buffer.\n");
+    log("Error: Failed to create the vertex buffer.\n");
     return hr;
   }
 
-  UINT stride = sizeof(float) * 3;
+  UINT stride = sizeof(float) * 5;
   UINT offset = 0;
   d3d_context->IASetVertexBuffers(0, 1, &d3d_buffer, &stride, &offset);
-  d3d_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  d3d_context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
   d3d_context->VSSetShader(d3d_vs, NULL, 0); /* Set vertex shader. */
   d3d_context->PSSetShader(d3d_ps, NULL, 0);
 
-  log("Pipeline initialized.\n");
+  log("Info: Pipeline initialized.");
 
   return hr;
 }
@@ -387,10 +575,37 @@ void renderFrame() {
   }
 
   FLOAT col[4] = { 0.0f, 0.2f, 0.4f, 1.0f } ;
-  d3d_context->ClearRenderTargetView(d3d_backbuf, col);
+  
+  D3D11_VIEWPORT vp;
+  ZeroMemory(&vp, sizeof(vp));
+  vp.TopLeftX = 0;
+  vp.TopLeftY = 0;
 
-  /* Render using the vertex buffer we've bound in initPipeline(). */
-  d3d_context->Draw(3, 0);
+  d3d_context->PSSetSamplers(0, 1, &d3d_linear_sampler);
+  d3d_context->PSSetShaderResources(0, 1, &d3d_source_tex_resview);
+  
+  /* Render the scene into the destination texture. */
+  {
+
+    vp.Width = dest_width;
+    vp.Height = dest_height;
+    d3d_context->RSSetViewports(1, &vp);
+
+    d3d_context->OMSetRenderTargets(1, &d3d_dest_targetview, NULL);
+    d3d_context->ClearRenderTargetView(d3d_dest_targetview, col);
+    d3d_context->Draw(4, 0);
+  }
+
+  /* Render the scene. */
+  {
+    vp.Width = 500;
+    vp.Height = 400;
+    d3d_context->RSSetViewports(1, &vp);
+
+    d3d_context->OMSetRenderTargets(1, &d3d_backbuf, NULL);
+    d3d_context->ClearRenderTargetView(d3d_backbuf, col);
+    d3d_context->Draw(4, 0);     /* Render using the vertex buffer we've bound in initPipeline(). */
+  }
 
   /* Switch back buffer and frond buffer. */
   d3d_chain->Present(0,0);
@@ -399,6 +614,36 @@ void renderFrame() {
 HRESULT shutdownDirect3D() {
   
   HRESULT hr = S_OK;
+
+  if (NULL != d3d_dest_tex_resview) {
+    d3d_dest_tex_resview->Release();
+    d3d_dest_tex_resview = NULL;
+  }
+  
+  if (NULL != d3d_dest_tex) {
+    d3d_dest_tex->Release();
+    d3d_dest_tex = NULL;
+  }
+
+  if (NULL != d3d_dest_targetview) {
+    d3d_dest_targetview->Release();
+    d3d_dest_targetview = NULL;
+  }
+
+  if (NULL != d3d_linear_sampler) {
+    d3d_linear_sampler->Release();
+    d3d_linear_sampler = NULL;
+  }
+
+  if (NULL != d3d_source_tex) {
+    d3d_source_tex->Release();
+    d3d_source_tex = NULL;
+  }
+
+  if (NULL != d3d_source_tex_resview) {
+    d3d_source_tex_resview->Release();
+    d3d_source_tex_resview = NULL;
+  }
 
   if (NULL != d3d_buffer) {
     d3d_buffer->Release();

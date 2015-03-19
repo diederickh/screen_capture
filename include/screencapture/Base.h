@@ -46,6 +46,7 @@ namespace sc {
     virtual int shutdown() = 0;                                  /* Shutdown the screencapturer; release all allocated memory and reset state as it was before init. Should be used as a destructor*/
     virtual int configure(Settings settings) = 0;                /* Configure the capturer using the provided settings. */
     virtual int start() = 0;                                     /* Should start capturing. Can be called multiple times when init() has been called. Note that before calling start, the user needs to call stop(). */
+    virtual void update() = 0;                                   /* Some capture APIs need to poll for new frames; they can use this. */
     virtual int stop() = 0;                                      /* Should stop capturing. "" "" "" */
 
     /* Features */

@@ -1,3 +1,12 @@
+/*
+
+  Mac Console ScreenCapture
+  -------------------------
+  
+  Although this is not really Mac specific, it's used to 
+  test and develop the Mac screen grabber. 
+
+ */
 #define ROXLU_USE_PNG
 #define ROXLU_USE_JPG
 #define ROXLU_IMPLEMENTATION
@@ -15,7 +24,7 @@ int main() {
   printf("\n\ntest_mac_screencapture_console\n\n");
 
   std::vector<Display*> displays;
-  Settings settings;
+
   ScreenCapture capture(on_frame);
 
   if (0 != capture.init()) {

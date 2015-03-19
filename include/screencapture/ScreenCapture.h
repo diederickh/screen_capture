@@ -70,6 +70,8 @@
 
 #if defined(__APPLE__)
 #  include <screencapture/mac/ScreenCaptureDisplayStream.h>
+#elif defined(_WIN32)
+#  include <screencapture/win/ScreenCaptureDuplicateOutputDirect3D11.h>
 #endif
 
 namespace sc {

@@ -58,6 +58,7 @@ namespace sc {
     /* Control */
     int configure(Settings settings);
     int start();
+    void update() { } 
     int stop();
 
     /* Features */
