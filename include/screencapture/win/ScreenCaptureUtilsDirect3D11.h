@@ -8,12 +8,17 @@
 #include <vector>
 #include <D3D11.h>
 
+#define COM_RELEASE(ptr)          \
+  if (NULL != ptr) {              \
+    ptr->Release();               \
+    ptr = NULL;                   \
+  }
+
 namespace sc {
 
   std::string hresult_to_string(HRESULT hr);
   std::vector<std::string> get_d3d11_bind_flags(UINT flag);
   void print_d3d11_texture2d_info(ID3D11Texture2D* tex);
-  
   
 } /* namespace sc */
 #endif

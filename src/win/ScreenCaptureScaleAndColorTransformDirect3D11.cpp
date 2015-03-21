@@ -1,11 +1,6 @@
 #include <screencapture/win/ScreenCaptureScaleAndColorTransformDirect3D11.h>
+#include <screencapture/win/ScreenCaptureUtilsDirect3D11.h>
 #include <algorithm>
-
-#define COM_RELEASE(ptr)          \
-  if (NULL != ptr) {              \
-    ptr->Release();               \
-    ptr = NULL;                   \
-  }
 
 static const std::string D3D11_SCALE_SHADER = ""
   "Texture2D tex_source: register(t0);\n"
@@ -118,6 +113,11 @@ namespace sc {
       return -5;
     }
 
+    if (0 != pointer.init(cfg.device, cfg.context)) {
+      printf("Error: failed to initialize the pointer drawer.\n");
+      return -6;
+    }
+
     settings = cfg;
     device = cfg.device;
     context = cfg.context;
@@ -139,7 +139,7 @@ namespace sc {
       if (S_OK != hr) {
         printf("Error: failed to create the vertex shader.\n");
         if (NULL != vs_err) {
-          std::string err_msg((char*)vs_err->GetBufferPointer(), vs_err->GetBufferSize());
+          err_msg.assign((char*)vs_err->GetBufferPointer(), vs_err->GetBufferSize());
           printf("Error: %s", err_msg.c_str());
           goto error;
         }
@@ -473,6 +473,8 @@ namespace sc {
         scale_viewport.MaxDepth = 1.0f;
         scale_viewport.Width = scale_ratio * desc.Width;
         scale_viewport.Height = scale_ratio * desc.Height;
+
+        pointer.setViewport(scale_viewport);
       }
 
       D3D11_SHADER_RESOURCE_VIEW_DESC desc;
@@ -505,6 +507,8 @@ namespace sc {
     context->OMSetRenderTargets(1, &dest_target_view, NULL);
     context->Draw(4, 0);
 
+    pointer.draw();
+
     /* Copy the scaled version into our staging tex so we can download it. */
     context->CopyResource(staging_tex, dest_tex);
 
@@ -532,6 +536,8 @@ namespace sc {
 
   int ScreenCaptureScaleAndColorTransformDirect3D11::shutdown() {
 
+    int r = 0;
+    
     is_init = -1;
     device = NULL;
     context = NULL;
@@ -547,7 +553,11 @@ namespace sc {
     COM_RELEASE(input_layout);
     COM_RELEASE(vertex_buffer);
 
-    return 0;
+    if (0 != pointer.shutdown()) {
+      r -= 1;
+    }
+
+    return r;
   }
   
 } /* namespace */

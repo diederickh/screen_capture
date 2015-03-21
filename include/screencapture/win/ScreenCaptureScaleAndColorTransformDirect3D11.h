@@ -9,7 +9,14 @@
   take this texture and scale it to a certain destination size and perform 
   color transforms (if necessary). 
 
-
+  ----------------------------------------------------------
+                  I M P O R T A N T 
+  ----------------------------------------------------------
+  This class is now actually drawing everything; we should 
+  rename it to something like 'ScreenCaptureDuplicateOutputDrawer'
+  because we scale, render the cursor, etc.. 
+  @todo rename 'ScreenCaptureScaleAndColorTransform'
+  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
  */
 
 #ifndef SCREEN_CAPTURE_SCALE_TRANSFORM_DIRECT3D11_H
@@ -24,6 +31,7 @@
 #include <D3D11.h>       /* For the D3D11* interfaces. */
 #include <D3DCompiler.h>
 #include <screencapture/win/ScreenCaptureUtilsDirect3D11.h>
+#include <screencapture/win/ScreenCapturePointerDirect3D11.h>
 
 namespace sc {
 
@@ -73,7 +81,8 @@ namespace sc {
     ID3D11InputLayout* input_layout;                                     /* The input layout that defines our vertex buffer. */
     ID3D11Buffer* vertex_buffer;                                         /* The Position + Texcoord vertex buffer. */
     D3D11_VIEWPORT scale_viewport;
-    ScaleColorTransformSettingsD3D11 settings;                           /* We copy the settings that are passed into init(). */   
+    ScaleColorTransformSettingsD3D11 settings;                           /* We copy the settings that are passed into init(). */
+    ScreenCapturePointerDirect3D11 pointer;                              /* Takes care of drawing the pointer. */
   }; 
 
   /* ----------------------------------------------------------- */

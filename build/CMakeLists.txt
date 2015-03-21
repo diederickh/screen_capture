@@ -24,6 +24,7 @@ set(screencapture_lib_sources
   ${sd}/ScreenCapture.cpp
   ${sd}/Base.cpp
   ${sd}/Types.cpp
+  ${sd}/Utils.cpp
   )
 
 if (APPLE)
@@ -57,6 +58,7 @@ elseif(WIN32)
   list(APPEND screencapture_lib_sources
     ${sd}/win/ScreenCaptureDuplicateOutputDirect3D11.cpp
     ${sd}/win/ScreenCaptureScaleAndColorTransformDirect3D11.cpp
+    ${sd}/win/ScreenCapturePointerDirect3D11.cpp
     ${sd}/win/ScreenCaptureUtilsDirect3D11.cpp
     )
   
