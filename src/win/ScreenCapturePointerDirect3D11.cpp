@@ -27,7 +27,7 @@ static const std::string D3D11_POINTER_SHADER = ""
   "  PixelInput output = (PixelInput) 0;\n"
   "  matrix m = mul(mm, pm);\n"
   "  output.pos = mul(vertex.pos, mm);\n"
-  "  output.pos = mul(output.pos, m);\n"
+  "  output.pos = mul(output.pos, pm);\n"
 
   "  output.tex = vertex.tex;\n"
   "  return output;\n"
@@ -216,12 +216,22 @@ namespace sc {
     }
     
     /* Create the vertex buffer. */
+#if 0    
     float vertices[] = {
       -0.5f, -0.5f, 0.0f,  0.0f, 1.0f,   /* bottom left */
       -0.5f,  0.5f, 0.0f,  0.0f, 0.0f,   /* top left */
       0.5f, -0.5f, 0.0f,  1.0f, 1.0f,    /* bottom right */
       0.5f,  0.5f, 0.0f,  1.0f, 0.0f     /* top right */
     };
+#else
+    float vertices[] = {
+      0.0f, 0.0f, 0.0f,  0.0f, 1.0f,   /* bottom left */
+      0.0f, 1.0f, 0.0f,  0.0f, 0.0f,   /* top left */
+      1.0f, 0.0f, 0.0f,  1.0f, 1.0f,    /* bottom right */
+      1.0f, 1.0f, 0.0f,  1.0f, 0.0f     /* top right */
+    };
+
+#endif
 
     int num_floats = 20;
 
@@ -320,11 +330,26 @@ namespace sc {
     printf("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
 
     create_identity_matrix(buffer_data->mm);
-    buffer_data->mm[0] = 0.25;
-    buffer_data->mm[5] = 0.5;
-    //   buffer_data->mm[10] = 1.0f;
+    buffer_data->mm[0] = 100.25;
+    buffer_data->mm[5] = 100.5;
+    //    buffer_data->mm[10] = 1.0f;
+    //    buffer_data->mm[14] = 1.0f;
 
-    create_ortho_matrix(0, vp.Width, vp.Height, 0.0f, 0.1f, 100.0f, buffer_data->pm);
+    create_ortho_matrix(0, vp.Width, vp.Height, 0.0f,-0.1f, 100.0f, buffer_data->pm);
+
+    float* p = buffer_data->pm;
+    p[2] = -p[2];
+    p[6] = -p[6];
+    p[10] = -p[10];
+    p[14] = -p[14];
+
+    p = buffer_data->mm;
+    p[2] = -p[2];
+    p[6] = -p[6];
+    p[8] = -p[8];
+    p[9] = -p[9];
+    p[11] = -p[11];
+
     
     printf("Model Matrix.\n");
     print_matrix(buffer_data->mm);
