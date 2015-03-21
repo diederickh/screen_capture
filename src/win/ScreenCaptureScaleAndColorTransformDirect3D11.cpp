@@ -1,4 +1,5 @@
 #include <screencapture/win/ScreenCaptureScaleAndColorTransformDirect3D11.h>
+#include <algorithm>
 
 #define COM_RELEASE(ptr)          \
   if (NULL != ptr) {              \
@@ -205,6 +206,8 @@ namespace sc {
     if (S_OK != hr) {
       goto error;
     }
+
+    ZeroMemory(&scale_viewport, sizeof(scale_viewport));
 
     COM_RELEASE(ps_blob);
     COM_RELEASE(vs_blob);
@@ -452,6 +455,26 @@ namespace sc {
     /* Create the Shader Resource View */
     if (NULL == src_tex_view) {
 
+      /* Create the viewport */
+      {
+        D3D11_TEXTURE2D_DESC desc;
+        ZeroMemory(&desc, sizeof(desc));
+        
+        tex->GetDesc(&desc);
+        float width_ratio = float(settings.output_width) / desc.Width;
+        float height_ratio = float(settings.output_height) / desc.Height;
+        float scale_ratio = std::min<float>(width_ratio, height_ratio);
+        float new_width = scale_ratio * desc.Width;
+        float new_height = scale_ratio * desc.Height;
+
+        scale_viewport.TopLeftX = (settings.output_width - new_width) * 0.5;
+        scale_viewport.TopLeftY = (settings.output_height - new_height) * 0.5;
+        scale_viewport.MinDepth = 0.0f;
+        scale_viewport.MaxDepth = 1.0f;
+        scale_viewport.Width = scale_ratio * desc.Width;
+        scale_viewport.Height = scale_ratio * desc.Height;
+      }
+
       D3D11_SHADER_RESOURCE_VIEW_DESC desc;
       ZeroMemory(&desc, sizeof(desc));
       
@@ -467,17 +490,6 @@ namespace sc {
       }
     }
 
-    /* Set viewport */
-    D3D11_VIEWPORT vp;
-    vp.TopLeftX = 0.2;
-    vp.TopLeftY = 0.2;
-    vp.MinDepth = 0.0f;
-    vp.MaxDepth = 1.0f;
-    vp.Width = settings.output_width;
-    vp.Height = settings.output_height;
-    
-    context->RSSetViewports(1, &vp);
-
     /* Set vertex layout and buffer. */
     UINT stride = sizeof(float) * 5; /* @todo I guess it's better to make this a member so we can set it where we create the vertex buffer. */
     UINT offset = 0;
@@ -489,6 +501,7 @@ namespace sc {
     context->PSSetShader(ps_scale, NULL, 0);
     context->PSSetSamplers(0, 1, &sampler);
     context->PSSetShaderResources(0, 1, &src_tex_view);
+    context->RSSetViewports(1, &scale_viewport);
     context->OMSetRenderTargets(1, &dest_target_view, NULL);
     context->Draw(4, 0);
 
@@ -502,7 +515,9 @@ namespace sc {
     hr = context->Map(staging_tex, 0, D3D11_MAP_READ,  0, &map);
     
     if (S_OK == hr) {
-      settings.cb_scaled((uint8_t*)map.pData, settings.output_width, settings.output_height, settings.cb_user);
+      /* @todo pass the rowPitch too! */
+      // printf("NBYTES: %u\n", map.DepthPitch);
+      settings.cb_scaled((uint8_t*)map.pData, (int)map.RowPitch, settings.output_width, settings.output_height, settings.cb_user);
       context->Unmap(staging_tex, 0);
     }
     else if (E_INVALIDARG == hr) {
@@ -520,6 +535,7 @@ namespace sc {
     is_init = -1;
     device = NULL;
     context = NULL;
+    ZeroMemory(&scale_viewport, sizeof(scale_viewport));
 
     COM_RELEASE(dest_tex);
     COM_RELEASE(staging_tex);

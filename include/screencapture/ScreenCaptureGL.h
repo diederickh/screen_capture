@@ -65,10 +65,6 @@
    #include <pthread.h>
 #endif
 
-/* @todo remove, just for debugging. */
-#define ROXLU_USE_PNG
-#include <tinylib.h>
-
 namespace sc {
   
   /* --------------------------------------------------------------------------- */
@@ -117,8 +113,7 @@ namespace sc {
 
 #if defined(_WIN32)
   struct ScreenMutex {
-    //CRITICAL_SECTION handle;
-    HANDLE handle;
+    CRITICAL_SECTION handle;
   };
 #elif defined(__linux) or defined(__APPLE__)
   struct ScreenMutex {
@@ -178,6 +173,8 @@ namespace sc {
     GLuint tex1;                                                                 /* Second plane, only used when we receive planar data. */  
     float pm[16];                                                                /* The projection matrix. */
     float vm[16];                                                                /* The view matrix. */
+    int unpack_alignment[3];
+    int unpack_row_length[3];
   };
 
   /* --------------------------------------------------------------------------- */
@@ -281,6 +278,8 @@ namespace sc {
   {
     memset(pm, 0x00, sizeof(pm));
     memset(vm, 0x00, sizeof(vm));
+    memset(unpack_alignment, 0x00, sizeof(unpack_alignment));
+    memset(unpack_row_length, 0x00, sizeof(unpack_row_length));
   }
 
   ScreenCaptureGL::~ScreenCaptureGL() {
@@ -353,6 +352,7 @@ namespace sc {
       pixels = NULL;
     }
 
+    /*
     if (SC_BGRA == cfg.pixel_format) {
       nbytes = cfg.output_width * cfg.output_height * 4;
       pixels = new uint8_t[nbytes];
@@ -362,6 +362,8 @@ namespace sc {
       printf("Error: unsupported pixel format in ScreenCaptureGL::configure: %s\n", screencapture_pixelformat_to_string(cfg.pixel_format).c_str());
       return -3;
     }
+    */
+
     
     if (0 != setupGraphics()) {
       return -4;
@@ -500,34 +502,47 @@ namespace sc {
 
   void ScreenCaptureGL::update() {
 
+    bool changed_unpack = false;
+
     cap.update();
-    
+
+#if !defined(NDEBUG)    
+    if (SC_BGRA != settings.pixel_format) {
+      printf("Error: trying to update the ScreenCaptureGL, but we only support uploading of SC_BGRA data atm.\n");
+      return;
+    }
+#endif
+
+    /* When we have a new frame, make sure we set the correct upload state. */
+    if (true == has_new_frame) {
+      glBindTexture(GL_TEXTURE_2D, tex0);
+
+        if (0 != unpack_row_length[0]) {
+          glPixelStorei(GL_UNPACK_ROW_LENGTH, unpack_row_length[0]);
+          changed_unpack = true;
+        }
+        
+        if (0 != unpack_alignment[0]) {
+          glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+          changed_unpack = true;
+        }
+    }
+            
+    /* Update the pixel data. */
     lock();
     {
       if (true == has_new_frame) {
-        glBindTexture(GL_TEXTURE_2D, tex0);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, settings.output_width,  settings.output_height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
         has_new_frame = false;
-#if 0        
-        char fname[512];
-        static int num = 0;
-        if (num < 50) {
-          for (int i = 0; i < settings.output_width; ++i) {
-            for (int j = 0; j < settings.output_height; ++j) {
-              int dx = j * settings.output_width * 4 + i * 4;
-              pixels[dx + 2] = 0xFF;
-              pixels[dx + 3] = 0xFF;
-            }
-          }
-          sprintf(fname, "gl_%03d.png", num);
-          rx_save_png(fname, pixels, settings.output_width, settings.output_height, 4, false);
-        }
-        ++num;
-#endif
-
       }
     }
     unlock();
+
+    /* Reset unpack state. */
+    if (true == changed_unpack) {
+      glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+      glPixelStorei(GL_UNPACK_ALIGNMENT, 0);
+    }
   }
 
   void ScreenCaptureGL::draw() {
@@ -759,30 +774,23 @@ namespace sc {
 
 #if defined(_WIN32)
 
-  /* @todo use Critical Sections or Mutex? */
   int sc_gl_create_mutex(ScreenMutex& m) {
-    // InitializeCriticalSection(&m.handle);
-    m.handle = CreateMutex(NULL, FALSE, NULL);
+     InitializeCriticalSection(&m.handle);
     return 0;
   }
 
   int sc_gl_lock_mutex(ScreenMutex& m) {
-
-    //EnterCriticalSection(&m.handle);
-    WaitForSingleObject(m.handle, INFINITE);
+    EnterCriticalSection(&m.handle);
     return 0;
   }
 
   int sc_gl_unlock_mutex(ScreenMutex& m) {
-
-    //LeaveCriticalSection(&m.handle);
-    ReleaseMutex(m.handle);
+    LeaveCriticalSection(&m.handle);
     return 0;
   }
 
   int sc_gl_destroy_mutex(ScreenMutex& m) {
-    // DeleteCriticalSection(&m.handle);
-    CloseHandle(m.handle);
+     DeleteCriticalSection(&m.handle);
     return 0;
   }
 
@@ -840,7 +848,7 @@ namespace sc {
     }
 
     if (SC_BGRA == buffer.pixel_format) {
-      
+     
       if (0 == buffer.nbytes[0]) {
         printf("Error: the number of bytes hasn't been set in the ScreenCapture.\n");
         return;
@@ -851,6 +859,33 @@ namespace sc {
         return;
       }
 
+      if (NULL == gl->pixels) {
+        
+        gl->pixels = new uint8_t[buffer.nbytes[0]];
+
+        /* Check if we need to change the alignment. */
+        int vals[] = { 1, 2, 4, 8 } ;
+        int unpack = 0;
+        for (int i = 0; i < 4; ++i) {
+          int p = pow(2, vals[i]);
+          int d = buffer.stride[0] % p;
+          if (0 != d) {
+            break;
+          }
+          unpack = vals[i];
+        }
+        
+        /* 4 is default. */
+        if (4 != unpack) {
+          gl->unpack_alignment[0] = unpack;
+        }
+
+        /* Do we need a different unpack row length? (the 4 is from GL_BGRA) */
+        if (buffer.stride[0] > buffer.width * 4) {
+          gl->unpack_row_length[0] = buffer.stride[0] / 4;
+        }
+      }
+
       gl->lock();
       {
         memcpy(gl->pixels, buffer.plane[0], buffer.nbytes[0]);
@@ -858,7 +893,6 @@ namespace sc {
       }
       gl->unlock();
     }
-
   }
   
   /* --------------------------------------------------------------------------- */

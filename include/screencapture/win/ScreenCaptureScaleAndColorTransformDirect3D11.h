@@ -27,7 +27,7 @@
 
 namespace sc {
 
-  typedef void(*scale_color_callback)(uint8_t* pixels, int width, int height, void* user);
+  typedef void(*scale_color_callback)(uint8_t* pixels, int stride, int width, int height, void* user);
 
   /* ----------------------------------------------------------- */
   
@@ -72,6 +72,7 @@ namespace sc {
     ID3D11VertexShader* vs_scale;                                        /* Vertex shader, used to scale. */
     ID3D11InputLayout* input_layout;                                     /* The input layout that defines our vertex buffer. */
     ID3D11Buffer* vertex_buffer;                                         /* The Position + Texcoord vertex buffer. */
+    D3D11_VIEWPORT scale_viewport;
     ScaleColorTransformSettingsD3D11 settings;                           /* We copy the settings that are passed into init(). */   
   }; 
 

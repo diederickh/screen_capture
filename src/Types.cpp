@@ -35,17 +35,18 @@ namespace sc {
 
   int PixelBuffer::init(int w, int h, int fmt) {
 
-    if (w < 0) {
+    if (w <= 0) {
       printf("Error: initializing a PixelBuffer with a width which is < 0. %d\n", w);
       return -1;
     }
 
-    if (h < 0) {
+    if (h <= 0) {
       printf("Error: initializing a PixelBuffer with a height which is < 0. %d\n", h);
       return -2;
     }
 
     if (SC_BGRA == fmt) {
+      /* This may be overwritten by the capture driver. */
       nbytes[0] = w * h * 4;
     }
     else {

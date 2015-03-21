@@ -6,7 +6,7 @@ namespace sc {
 
   /* ----------------------------------------------------------- */
   
-  void on_scaled_pixels(uint8_t* pixels, int width, int height, void* user);
+  void on_scaled_pixels(uint8_t* pixels, int stride, int width, int height, void* user);
   
   /* ----------------------------------------------------------- */
   
@@ -58,12 +58,12 @@ namespace sc {
 
       if (0 != adapters.size()) {
         printf("Error: our internal adapters vector contains some elements. Not supposed to happen.\n");
-        return -2;
+        return -6;
       }
 
       if (0 != outputs.size()) {
         printf("Error: our outputs vector contains some elements. Not supposed to happen.\n");
-        return -3;
+        return -7;
       }
     }
 
@@ -72,7 +72,7 @@ namespace sc {
     if (S_OK != hr) {
       printf("Error: failed to retrieve a IDXGIFactory1.\n");
       shutdown();
-      return -3;
+      return -8;
     }
 
     UINT i = 0;
@@ -85,7 +85,7 @@ namespace sc {
     if (0 == adapters.size()) {
       printf("Error: no adapter founds, so we cannot enumerate displays.\n");
       shutdown();
-      return -4;
+      return -9;
     }
 
     /* Check what devices/monitors are attached to the adapters. */
@@ -106,7 +106,7 @@ namespace sc {
     if (0 == outputs.size()) {
       printf("Error: no outputs found.\n");
       shutdown();
-      return -6;
+      return -10;
     }
 
     /* Get information about the monitors. */
@@ -124,7 +124,7 @@ namespace sc {
       if (S_OK != hr) {
         printf("Error: failed to retrieve the output description for monitor: %lu\n", i);
         shutdown();
-        return -7;
+        return -11;
       }
       
       sc::Display* display = NULL;
@@ -148,7 +148,7 @@ namespace sc {
       if (NULL == display) {
         printf("Error: display is NULL. Not supposed to happen.\n");
         shutdown();
-        return -8;
+        return -12;
       }
 
       display->info = (void*)output;
@@ -172,10 +172,11 @@ namespace sc {
     if (S_OK != hr) {
       printf("Error: failed to create the D3D11 Device and Context.\n");
       shutdown();
-      return -9;
+      return -13;
     }
        
     return 0;
+    
   } /* init */
 
   int ScreenCaptureDuplicateOutputDirect3D11::shutdown() {
@@ -236,7 +237,8 @@ namespace sc {
       frame->Release();
       frame = NULL;
     }
-    return 0;
+    
+    return r;
   }
 
   int ScreenCaptureDuplicateOutputDirect3D11::configure(Settings cfg) {
@@ -270,8 +272,6 @@ namespace sc {
       duplication = NULL;
     }
 
-    /* @todo - test output_width / height */
-    
     if (0 != pixel_buffer.init(cfg.output_width, cfg.output_height, cfg.pixel_format)) {
       printf("Error: failed to initialize the pixel buffer.");
       return -4;
@@ -299,25 +299,25 @@ namespace sc {
     
     if (0 != transform.init(trans_cfg)) {
       printf("Error: failed to initialize the tansform for the screen capture.\n");
-      return -3;
+      return -5;
     }
 
     Display* display = displays[cfg.display];
     if (NULL == display->info) {
       printf("Error: The display doesn't a valid info member. Not supposed to happen.\n");
-      return -2;
+      return -6;
     }
     
     IDXGIOutput* monitor = static_cast<IDXGIOutput*>(display->info);
     if (NULL == monitor) {
       printf("Error: failed to cast the info member of the display to IDXGIOutput*.\n");
-      return -3;
+      return -7;
     }
     
     hr = monitor->QueryInterface(__uuidof(IDXGIOutput1), (void**)&output);
     if (S_OK != hr) {
       printf("Error: failed to query the IDXGIOutput1 which exposes the Output Duplication interface.\n");
-      return -4;
+      return -8;
     }
 
     hr = output->DuplicateOutput(device, &duplication);
@@ -325,30 +325,30 @@ namespace sc {
       printf("Error: failed to duplicate the output.\n");
       output->Release();
       output = NULL;
-      return -6;
+      return -9;
     }
 
     /* Get info about the output (monitor). */
     ZeroMemory(&output_desc, sizeof(output_desc));
     hr = output->GetDesc(&output_desc);
+    
     if (S_OK != hr) {
       printf("Error: failed to retrieve output information.\n");
-
       output->Release();
-      output = NULL;
-      
       duplication->Release();
+      output = NULL;
       duplication = NULL;
-      
-      return -7;
+      return -10;
     }
-      
+
+#if !defined(NDEBUG)    
     printf("The monitor has the following dimensions: left: %d, right: %d, top: %d, bottom: %d.\n"
            ,(int)output_desc.DesktopCoordinates.left
            ,(int)output_desc.DesktopCoordinates.right
            ,(int)output_desc.DesktopCoordinates.top
            ,(int)output_desc.DesktopCoordinates.bottom
            );
+#endif    
 
     /* Currently this class assumes the captured desktop image is in GPU
        mem; and we optimised for this. If the memory is already in CPU we
@@ -360,11 +360,10 @@ namespace sc {
     if (TRUE == duplication_desc.DesktopImageInSystemMemory) {
       printf("Error: the desktop image is already in system memory; this is something we still need to implement.\n");
       output->Release();
-      output = NULL;
-
       duplication->Release();
+      output = NULL;
       duplication = NULL;
-      return -8;
+      return -11;
     }
 
     return 0;
@@ -462,7 +461,7 @@ namespace sc {
 
   /* ----------------------------------------------------------- */
   
-  void on_scaled_pixels(uint8_t* pixels, int width, int height, void* user) {
+  void on_scaled_pixels(uint8_t* pixels, int stride, int width, int height, void* user) {
 
     ScreenCaptureDuplicateOutputDirect3D11* cap = static_cast<ScreenCaptureDuplicateOutputDirect3D11*>(user);
     if (NULL == cap) {
@@ -477,13 +476,12 @@ namespace sc {
 
     if (SC_BGRA == cap->pixel_buffer.pixel_format) {
       cap->pixel_buffer.plane[0] = pixels;
-      cap->pixel_buffer.stride[0] = width * 4;
+      cap->pixel_buffer.stride[0] = stride;
+      cap->pixel_buffer.nbytes[0] = stride * height;
       cap->callback(cap->pixel_buffer);
     }
     else {
       printf("Error: we received a pixel buffer, but we're only supprt BGRA atm.\n");
     }
   }
-  
- 
 } /* namespace sc */

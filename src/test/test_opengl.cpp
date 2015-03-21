@@ -76,8 +76,6 @@ int main() {
   cfg.pixel_format = SC_BGRA;
   cfg.output_width = 1280;
   cfg.output_height = 720;
-  //cfg.output_width = 1680;
-  // cfg.output_height = 1050;
 
   if (0 != cap.init()) {
     exit(EXIT_FAILURE);

@@ -108,8 +108,6 @@ namespace sc {
   inline int Base::canChangeCursorVisibility() {
     return -1;
   }
-    
-
 
   /* ----------------------------------------------------------- */
   

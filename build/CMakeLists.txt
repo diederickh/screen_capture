@@ -26,7 +26,6 @@ set(screencapture_lib_sources
   ${sd}/Types.cpp
   )
 
-
 if (APPLE)
 
   find_library(fr_corefoundation CoreFoundation)
