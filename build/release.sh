@@ -19,7 +19,7 @@ cd ${my_build_dir}
 cd build.release
 
 cmake \
-    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_BUILD_TYPE=${cmake_build_type} \
     -DCMAKE_INSTALL_PREFIX=${install_path} \
     -DEXTERN_LIB_DIR=${extern_path}/lib \
     -DEXTERN_INC_DIR=${extern_path}/include \
@@ -37,7 +37,7 @@ if [ $rc != 0 ]; then
     exit
 fi
 
-cmake --build . --target install --config Release
+cmake --build . --target install --config ${cmake_build_type}
 
 rc=$?; 
 if [ $rc != 0 ]; then
@@ -53,8 +53,9 @@ cd ${install_path}/bin
 
 #${debugger} ./test_mac_screencapture_console${debug_flag}
 #${debugger} ./test_mac_api_research${debug_flag}
-#${debugger} ./test_opengl${debug_flag}
+${debugger} ./test_opengl${debug_flag}
 #${debugger} ./test_win_api_directx_research${debug_flag}
 #${debugger} ./test_win_directx${debug_flag}
-${debugger} ./test_api${debug_flag}
+#${debugger} ./test_api${debug_flag}
+#${debugger} ./test_win_api${debug_flag}
 

@@ -58,6 +58,7 @@ elseif(WIN32)
   list(APPEND screencapture_lib_sources
     ${sd}/win/ScreenCaptureDuplicateOutputDirect3D11.cpp
     ${sd}/win/ScreenCaptureScaleAndColorTransformDirect3D11.cpp
+    ${sd}/win/ScreenCaptureUtilsDirect3D11.cpp
     )
   
   find_library(lib_dxgi dxgi.lib)
@@ -67,6 +68,8 @@ elseif(WIN32)
     dxgi.lib
     d3d11.lib
     d3dcompiler.lib
+    opengl32.lib
+    ${EXTERN_LIB_DIR}/glfw3.lib
     ${EXTERN_LIB_DIR}/libpng16_static.lib
     ${EXTERN_LIB_DIR}/zlibstatic.lib
     )
@@ -89,9 +92,10 @@ endmacro()
 
 #create_test(mac_api_research "mac_api_research.m")
 #create_test(mac_screencapture_console "mac_screencapture_console.cpp")
-#create_test(opengl "opengl.cpp;${EXTERN_SRC_DIR}/glad.c")
+create_test(opengl "opengl.cpp;${EXTERN_SRC_DIR}/glad.c" "")
 #create_test(math "math.cpp")
-#create_test(win_api_directx_research "win_api_directx_research.cpp")
-#create_test(win_directx "win_directx.cpp" WIN32)
+create_test(win_api_directx_research "win_api_directx_research.cpp" "")
+create_test(win_directx "win_directx.cpp" WIN32)
 create_test(api "api.cpp" "")
+create_test(win_api "win_api" WIN32)
 #install(FILES ${sd}/test/test_win_directx_shader.hlsl DESTINATION bin)install(FILES ${sd}/test/test_win_directx_shader.hlsl DESTINATION bin)

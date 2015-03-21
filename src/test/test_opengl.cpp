@@ -15,6 +15,11 @@
 #include <screencapture/ScreenCaptureGL.h>
 #include <GLFW/glfw3.h>
 
+/* @todo remove, just for debugging. */
+#define ROXLU_USE_PNG
+#define ROXLU_IMPLEMENTATION
+#include <tinylib.h>
+
 void button_callback(GLFWwindow* win, int bt, int action, int mods);
 void cursor_callback(GLFWwindow* win, double x, double y);
 void key_callback(GLFWwindow* win, int key, int scancode, int action, int mods);
@@ -71,6 +76,8 @@ int main() {
   cfg.pixel_format = SC_BGRA;
   cfg.output_width = 1280;
   cfg.output_height = 720;
+  //cfg.output_width = 1680;
+  // cfg.output_height = 1050;
 
   if (0 != cap.init()) {
     exit(EXIT_FAILURE);

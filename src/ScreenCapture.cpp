@@ -22,6 +22,7 @@ namespace sc {
       exit(EXIT_FAILURE);
     }
 
+    printf(">> SETTING CALLBACK: %p\n", callback);
     if (0 != impl->setCallback(callback, user)) {
       printf("Error: failed to set the callback on the screencapture driver. Not supposed to happen..\n");
       exit(EXIT_FAILURE);
@@ -215,8 +216,10 @@ namespace sc {
   void ScreenCapture::update() {
     
 #if !defined(NDEBUG)
-    printf("Error: trying to update the screencapturer, but we're not initialized; no implementation was allocated.\n");
-    exit(EXIT_FAILURE);
+    if (NULL == impl) {
+      printf("Error: trying to update the screencapturer, but we're not initialized; no implementation was allocated.\n");
+      exit(EXIT_FAILURE);
+    }
 #endif
     
     impl->update();

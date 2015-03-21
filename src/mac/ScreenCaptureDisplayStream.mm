@@ -126,7 +126,8 @@ namespace sc {
       printf("Error: failed to setup the the pixel format.\n");
       return -3;
     }
-    
+
+    /* @todo > WE DON'T WANT TO MAKE THIS THE RESPONSIBILITY OF AN IMPLEMENTATION! */
     pixel_buffer.user = user;
 
     /* @todo make some settings available through API. */

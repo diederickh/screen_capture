@@ -1,8 +1,15 @@
 #include <sstream> 
 #include <screencapture/win/ScreenCaptureDuplicateOutputDirect3D11.h>
+#include <screencapture/win/ScreenCaptureUtilsDirect3D11.h>
 
 namespace sc {
 
+  /* ----------------------------------------------------------- */
+  
+  void on_scaled_pixels(uint8_t* pixels, int width, int height, void* user);
+  
+  /* ----------------------------------------------------------- */
+  
   ScreenCaptureDuplicateOutputDirect3D11::ScreenCaptureDuplicateOutputDirect3D11()
     :Base()
     ,factory(NULL)
@@ -58,8 +65,6 @@ namespace sc {
         printf("Error: our outputs vector contains some elements. Not supposed to happen.\n");
         return -3;
       }
-
-
     }
 
     /* Retrieve the IDXGIFactory that can enumerate the adapters.*/
@@ -156,7 +161,7 @@ namespace sc {
     hr = D3D11CreateDevice(NULL,                     /* Adapter: The adapter (video card) we want to use. We may use NULL to pick the default adapter. */  
                            D3D_DRIVER_TYPE_HARDWARE, /* DriverType: We use the GPU as backing device. */
                            NULL,                     /* Software: we're using a D3D_DRIVER_TYPE_HARDWARE so it's not applicaple. */
-                           NULL,                     /* Flags: maybe we need to use D3D11_CREATE_DEVICE_BGRA_SUPPORT because desktop duplication is using this. */
+                           0,                        /* D3D11_CREATE_DEVICE_FLAG */  
                            NULL,                     /* Feature Levels (ptr to array):  what version to use. */
                            0,                        /* Number of feature levels. */
                            D3D11_SDK_VERSION,        /* The SDK version, use D3D11_SDK_VERSION */
@@ -169,17 +174,7 @@ namespace sc {
       shutdown();
       return -9;
     }
-
-    ScaleAndTransformSettingsD3D11 trans_cfg;
-    trans_cfg.device = device;
-    trans_cfg.context = context;
-    
-    if (0 != transform.init(trans_cfg)) {
-      printf("Error: failed to initialize the tansform for the screen capture.\n");
-      shutdown();
-      return -9;
-    }
-    
+       
     return 0;
   } /* init */
 
@@ -187,6 +182,8 @@ namespace sc {
 
     int r = 0;
 
+    has_frame = false;
+    
     if (0 != transform.shutdown()) {
       r -= 1;
     }
@@ -224,7 +221,21 @@ namespace sc {
       output->Release();
       output = NULL;
     }
-    
+
+    if (NULL != device) {
+      device->Release();
+      device = NULL;
+    }
+
+    if (NULL != context) {
+      context->Release();
+      context = NULL;
+    }
+
+    if (NULL != frame) {
+      frame->Release();
+      frame = NULL;
+    }
     return 0;
   }
 
@@ -242,6 +253,11 @@ namespace sc {
       printf("Error: the D3D11 device is NULL. Did you call init?\n");
       return -2;
     }
+
+    if (SC_BGRA != cfg.pixel_format) {
+      printf("Trying to configure the Screen Capture, but we received an unsupported pixel format. %d\n", cfg.pixel_format);
+      return -3;
+    }
        
     /* Check state */
     if (NULL != output) {
@@ -252,6 +268,38 @@ namespace sc {
     if (NULL != duplication) {
       duplication->Release();
       duplication = NULL;
+    }
+
+    /* @todo - test output_width / height */
+    
+    if (0 != pixel_buffer.init(cfg.output_width, cfg.output_height, cfg.pixel_format)) {
+      printf("Error: failed to initialize the pixel buffer.");
+      return -4;
+    }
+    
+    /* @todo > WE DON'T WANT TO MAKE THIS THE RESPONSIBILITY OF AN IMPLEMENTATION! */
+    pixel_buffer.user = user;
+    
+    /*
+      When the transform is already initialized, we first deallocate/release
+       all created objects that are used to perform the scaling. 
+    */
+    if (0 == transform.isInit()) {
+      transform.shutdown();
+    }
+
+    /* We can only initialize the transform, after we know the output width/height. */
+    ScaleColorTransformSettingsD3D11 trans_cfg;
+    trans_cfg.device = device;
+    trans_cfg.context = context;
+    trans_cfg.output_width = cfg.output_width;
+    trans_cfg.output_height = cfg.output_height;
+    trans_cfg.cb_scaled = on_scaled_pixels;
+    trans_cfg.cb_user = this;
+    
+    if (0 != transform.init(trans_cfg)) {
+      printf("Error: failed to initialize the tansform for the screen capture.\n");
+      return -3;
     }
 
     Display* display = displays[cfg.display];
@@ -318,7 +366,7 @@ namespace sc {
       duplication = NULL;
       return -8;
     }
-    
+
     return 0;
   }
 
@@ -329,6 +377,7 @@ namespace sc {
   void ScreenCaptureDuplicateOutputDirect3D11::update() {
 
     HRESULT hr = E_FAIL;
+    ID3D11Texture2D* frame_tex = NULL;
     
 #if !defined(NDEBUG)
     if (NULL == duplication) {
@@ -337,60 +386,62 @@ namespace sc {
     }
 #endif
 
-    /*
+   /*
       According to the remarks here: https://msdn.microsoft.com/en-us/library/windows/desktop/hh404623(v=vs.85).aspx
       we should release the frame just before calling AcquireNextFrame(). When we keep access of the 
-      frame (by NOT calling ReleaseFrame as long as possible), the OS won't copy all changes all the time.
+      frame (by NOT calling ReleaseFrame as long as possible), the OS won't copy all updated regions
+      until we call AcquireNextFrame again.
       
       @todo we need to check if this really improves performance :) 
 
     */
-    if (has_frame) {
-
-      hr = duplication->ReleaseFrame();
-      
-      if (S_OK != hr) {
-        printf("Error: failed to release the duplicated frame.\n");
-      }
+    if (true == has_frame) {
       
       has_frame = false;
-    }
+      hr = duplication->ReleaseFrame();
 
-    hr = duplication->AcquireNextFrame(0, &frame_info, &frame);
-
-    if (S_OK == hr) {
-      
-      /* Got a frame. */
-      printf("- Got a frame.\n");
-
-      /* @todo this is where we render the texture in the 'frame' into our target view. */
-      
-      has_frame = true;
-
-      if (NULL != frame) {
-        frame->Release();
-        frame = NULL;
+      if (S_OK != hr) {
+        printf("Error: failed to release the frame right before acquiring the next one.\n");
       }
     }
-    else if (DXGI_ERROR_WAIT_TIMEOUT == hr) {
-      /* Because our interval is 0 we may get a timeout often. */
 
+    /* Acquire a new frame. */
+    hr = duplication->AcquireNextFrame(100, &frame_info, &frame);
+
+    if (S_OK == hr) {
+
+      has_frame = true;
+      hr = frame->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&frame_tex);
+      
+      if (S_OK == hr) {
+        transform.scale(frame_tex);
+      }
+    }
+#if !defined(NDEBUG)    
+    else if (DXGI_ERROR_WAIT_TIMEOUT == hr) {
+      printf("Info: tried to acquire a desktop frame, but we timed out.\n");
     }
     else if (DXGI_ERROR_ACCESS_LOST == hr) {
       printf("Error: Access to the desktop duplication was lost. We need to handle this situation\n");
       /* See: https://msdn.microsoft.com/en-us/library/windows/desktop/hh404615(v=vs.85).aspx */
     }
-#if !defined(NDEBUG)    
     else if (DXGI_ERROR_INVALID_CALL == hr) {
       printf("Error: not supposed to happen but the call for AcquireNextFrame() failed.\n");
-
     }
-#endif
     else {
       printf("Warning: unhandled return of AcquireNextFrame().\n");
     }
+#endif
 
+    if (NULL != frame) {
+      frame->Release();
+      frame = NULL;
+    }
 
+    if (NULL != frame_tex) {
+      frame_tex->Release();
+      frame_tex = NULL;
+    }
   }
 
   int ScreenCaptureDuplicateOutputDirect3D11::stop() {
@@ -408,5 +459,31 @@ namespace sc {
     
     return 0;
   }
+
+  /* ----------------------------------------------------------- */
+  
+  void on_scaled_pixels(uint8_t* pixels, int width, int height, void* user) {
+
+    ScreenCaptureDuplicateOutputDirect3D11* cap = static_cast<ScreenCaptureDuplicateOutputDirect3D11*>(user);
+    if (NULL == cap) {
+      printf("Error: failed to cast the user ptr. to the capturer. Not supposed to happen.\n");
+      return;
+    }
+
+    if (NULL == cap->callback) {
+      printf("Error: callback is not set.\n");
+      return;
+    }
+
+    if (SC_BGRA == cap->pixel_buffer.pixel_format) {
+      cap->pixel_buffer.plane[0] = pixels;
+      cap->pixel_buffer.stride[0] = width * 4;
+      cap->callback(cap->pixel_buffer);
+    }
+    else {
+      printf("Error: we received a pixel buffer, but we're only supprt BGRA atm.\n");
+    }
+  }
+  
  
 } /* namespace sc */

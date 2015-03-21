@@ -65,6 +65,10 @@
    #include <pthread.h>
 #endif
 
+/* @todo remove, just for debugging. */
+#define ROXLU_USE_PNG
+#include <tinylib.h>
+
 namespace sc {
   
   /* --------------------------------------------------------------------------- */
@@ -113,7 +117,8 @@ namespace sc {
 
 #if defined(_WIN32)
   struct ScreenMutex {
-    CRITICAL_SECTION handle;
+    //CRITICAL_SECTION handle;
+    HANDLE handle;
   };
 #elif defined(__linux) or defined(__APPLE__)
   struct ScreenMutex {
@@ -494,6 +499,8 @@ namespace sc {
   }
 
   void ScreenCaptureGL::update() {
+
+    cap.update();
     
     lock();
     {
@@ -501,10 +508,26 @@ namespace sc {
         glBindTexture(GL_TEXTURE_2D, tex0);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, settings.output_width,  settings.output_height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
         has_new_frame = false;
+#if 0        
+        char fname[512];
+        static int num = 0;
+        if (num < 50) {
+          for (int i = 0; i < settings.output_width; ++i) {
+            for (int j = 0; j < settings.output_height; ++j) {
+              int dx = j * settings.output_width * 4 + i * 4;
+              pixels[dx + 2] = 0xFF;
+              pixels[dx + 3] = 0xFF;
+            }
+          }
+          sprintf(fname, "gl_%03d.png", num);
+          rx_save_png(fname, pixels, settings.output_width, settings.output_height, 4, false);
+        }
+        ++num;
+#endif
+
       }
     }
     unlock();
-
   }
 
   void ScreenCaptureGL::draw() {
@@ -665,6 +688,7 @@ namespace sc {
 
   /* checks + prints program link info. returns 0 when linking didn't result in an error, on link erorr < 0 */
   static int print_program_link_info(GLuint prog) {
+    
     GLint status = 0;
     GLint count = 0;
     GLchar* error = NULL;
@@ -735,23 +759,30 @@ namespace sc {
 
 #if defined(_WIN32)
 
+  /* @todo use Critical Sections or Mutex? */
   int sc_gl_create_mutex(ScreenMutex& m) {
-    InitializeCriticalSection(&m.handle);
+    // InitializeCriticalSection(&m.handle);
+    m.handle = CreateMutex(NULL, FALSE, NULL);
     return 0;
   }
 
   int sc_gl_lock_mutex(ScreenMutex& m) {
-    EnterCriticalSection(&m.handle);
+
+    //EnterCriticalSection(&m.handle);
+    WaitForSingleObject(m.handle, INFINITE);
     return 0;
   }
 
   int sc_gl_unlock_mutex(ScreenMutex& m) {
-    LeaveCriticalSection(&m.handle);
+
+    //LeaveCriticalSection(&m.handle);
+    ReleaseMutex(m.handle);
     return 0;
   }
 
   int sc_gl_destroy_mutex(ScreenMutex& m) {
-    DeleteCriticalSection(&m.handle);
+    // DeleteCriticalSection(&m.handle);
+    CloseHandle(m.handle);
     return 0;
   }
 
@@ -819,7 +850,7 @@ namespace sc {
         printf("Error: the plane data pointer is NULL.\n");
         return;
       }
-      
+
       gl->lock();
       {
         memcpy(gl->pixels, buffer.plane[0], buffer.nbytes[0]);

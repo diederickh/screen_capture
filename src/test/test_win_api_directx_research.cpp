@@ -332,7 +332,6 @@ int main() {
     exit(EXIT_FAILURE);
   }
    
-
   /* 
      Get some info about the output duplication. 
      When the DesktopImageInSystemMemory is TRUE you can use 
@@ -350,8 +349,8 @@ int main() {
   ID3D11Texture2D* tex = NULL;
   DXGI_MAPPED_RECT mapped_rect;
   
-  for (int i = 0; i < 150; ++i) {
-    printf("%02d - ", i);
+  for (int i = 0; i < 500; ++i) {
+    //  printf("%02d - ", i);
     
     hr = duplication->AcquireNextFrame(1000, &frame_info, &desktop_resource);
     if (DXGI_ERROR_ACCESS_LOST == hr) {
@@ -364,7 +363,7 @@ int main() {
       printf("Received a DXGI_ERROR_INVALID_CALL.\n");
     }
     else if (S_OK == hr) {
-      printf("Yay we got a frame.\n");
+      //printf("Yay we got a frame.\n");
 
       /* Print some info. */
       //printf("frame_info.TotalMetadataBufferSize: %u\n", frame_info.TotalMetadataBufferSize);
@@ -389,11 +388,11 @@ int main() {
         }
       }
       else if (DXGI_ERROR_UNSUPPORTED == hr) {
-        printf("MapDesktopSurface returned DXGI_ERROR_UNSUPPORTED.\n");
+        //printf("MapDesktopSurface returned DXGI_ERROR_UNSUPPORTED.\n");
         /* 
            According to the docs, when we receive this error we need
            to transfer the image to a staging surface and then lock the 
-           image by calling IDXGISurface::Map().
+            image by calling IDXGISurface::Map().
 
            To get the data from GPU to the CPU, we do:
 
@@ -423,14 +422,15 @@ int main() {
                                               &map);
 
         if (S_OK == map_result) {
-          printf("Mapped the staging tex; we can access the data now.\n");
-          printf("RowPitch: %u, DepthPitch: %u\n", map.RowPitch, map.DepthPitch);
-
+          unsigned char* data = (unsigned char*)map.pData;
+          //printf("Mapped the staging tex; we can access the data now.\n");
+          printf("RowPitch: %u, DepthPitch: %u, %02X, %02X, %02X\n", map.RowPitch, map.DepthPitch, data[0], data[1], data[2]);
+#if 0
           if (i < 25) {
             char fname[512];
 
             /* We have to make the image opaque. */
-            unsigned char* data = (unsigned char*)map.pData;
+
             for (int k = 0; k < tex_desc.Width; ++k) {
               for (int l = 0; l < tex_desc.Height; ++l) {
                 int dx = l * tex_desc.Width * 4 + k * 4;
@@ -442,7 +442,7 @@ int main() {
                      tex_desc.Width, tex_desc.Height, 8, PNG_COLOR_TYPE_RGBA,
                      (unsigned char*)map.pData, map.RowPitch, PNG_TRANSFORM_BGR);
           }
-
+#endif
         }
         else {
           printf("Error: failed to map the staging tex. Cannot access the pixels.\n");
@@ -463,7 +463,6 @@ int main() {
         printf("MapDesktopSurface returned an unknown error.\n");
       }
     }
-
 
     /* Clean up */
     {

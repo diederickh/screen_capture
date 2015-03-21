@@ -305,7 +305,7 @@ HRESULT initSourceTexture() {
   int channels = 0;
   int allocated = 0;
   
-  if (rx_load_png("texture.png", &pixels, width, height, channels, &allocated, RX_FLAG_LOAD_AS_RGBA) < 0) {
+  if (rx_load_png("./texture.png", &pixels, width, height, channels, &allocated, RX_FLAG_LOAD_AS_RGBA) < 0) {
     log("Error: failed to load texture.png");
     return E_FAIL;
   }
@@ -607,7 +607,7 @@ void renderFrame() {
     d3d_context->Draw(4, 0);     /* Render using the vertex buffer we've bound in initPipeline(). */
   }
 
-  /* Switch back buffer and frond buffer. */
+  /* Switch back buffer and front buffer. */
   d3d_chain->Present(0,0);
 }
 
