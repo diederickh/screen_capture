@@ -2,6 +2,9 @@
 #include <screencapture/win/ScreenCaptureDuplicateOutputDirect3D11.h>
 #include <screencapture/win/ScreenCaptureUtilsDirect3D11.h>
 
+#define ROXLU_USE_PNG
+#include <tinylib.h>
+
 namespace sc {
 
   /* ----------------------------------------------------------- */
@@ -444,15 +447,156 @@ namespace sc {
     }
   }
 
-  int ScreenCaptureDuplicateOutputDirect3D11::updateMouse(DGXI_OUTDUPL_FRAME_INFO* info) {
+  int ScreenCaptureDuplicateOutputDirect3D11::updateMouse(DXGI_OUTDUPL_FRAME_INFO* info) {
 
+    HRESULT hr = S_OK;
+    UINT required_size = 0;
+    DXGI_OUTDUPL_POINTER_SHAPE_INFO pointer_info;
+    
     if (NULL == info) {
       printf("Error: requested to update the mouse info but the given info pointer is NULL.\n");
       return -1;
     }
 
-    printf("info.LastMouseUpdateTime: %llu\n", info->LastMouseUpdateTime);
+    /* A non-zero value indicates a new pointer shape. */
+    if (0 != info->PointerShapeBufferSize) {
+
+      pointer_in_pixels.reserve(info->PointerShapeBufferSize);
+
+      hr = duplication->GetFramePointerShape(info->PointerShapeBufferSize,
+                                             &pointer_in_pixels[0],
+                                             &required_size,
+                                             &pointer_info);
+
+      if (S_OK != hr) {
+        printf("Error: failed to retrieve the frame pointer shape.\n");
+        return -2;
+      }
+      
+      printf("- %u <> %u <> %lu <> required: %u\n",
+             info->PointerShapeBufferSize,
+             info->TotalMetadataBufferSize,
+             pointer_in_pixels.capacity(),
+             required_size
+             );
+
+      size_t needed_size = pointer_info.Width * pointer_info.Height * 4;
+      if (pointer_out_pixels.capacity() < needed_size) {
+        pointer_out_pixels.reserve(needed_size);
+      }
+
+      if (DXGI_OUTDUPL_POINTER_SHAPE_TYPE_MONOCHROME == pointer_info.Type) {
+
+        int xor_offset = pointer_info.Pitch * (pointer_info.Height / 2);
+        uint8_t* and_map = &pointer_in_pixels.front();
+        uint8_t* xor_map = &pointer_in_pixels.front() + xor_offset;
+        uint8_t* out_pixels = &pointer_out_pixels.front();
+        int width_in_bytes = (pointer_info.Width + 7) / 8;
+        int img_height = pointer_info.Height;
+
+        for (int j = 0; j < img_height ; ++j) {
+          
+          uint8_t bit = 0x80;
+
+          for (int i = 0; i < pointer_info.Width; ++i) {
+            
+            uint8_t and_byte = and_map[ j * width_in_bytes + i / 8 ];
+            uint8_t xor_byte = xor_map[ j * width_in_bytes + i / 8 ];
+            uint8_t and_bit = (and_byte & bit) ? 1 : 0;
+            uint8_t xor_bit = (xor_byte & bit) ? 1 : 0;
+            int out_dx = j * pointer_info.Width * 4 + i * 4;
+            
+            if (0 == and_bit) {
+              if (0 == xor_bit) {
+                /* 0 - 0 = black */
+                out_pixels[out_dx + 0] = 0x00;
+                out_pixels[out_dx + 1] = 0x00;
+                out_pixels[out_dx + 2] = 0x00;
+                out_pixels[out_dx + 3] = 0xFF;
+              }
+              else {
+                /* 0 - 1 = white */
+                out_pixels[out_dx + 0] = 0xFF;
+                out_pixels[out_dx + 1] = 0xFF;
+                out_pixels[out_dx + 2] = 0xFF;
+                out_pixels[out_dx + 3] = 0xFF;
+              }
+            }
+            else {
+              if (0 == xor_bit) {
+                /* 1 - 0 = transparent (screen). */
+                out_pixels[out_dx + 0] = 0x00;
+                out_pixels[out_dx + 1] = 0x00;
+                out_pixels[out_dx + 2] = 0x00;
+                out_pixels[out_dx + 3] = 0x00;
+              }
+              else {
+                /* 1 - 1 = reverse, black. */
+                out_pixels[out_dx + 0] = 0x00;
+                out_pixels[out_dx + 1] = 0x00;
+                out_pixels[out_dx + 2] = 0x00;
+                out_pixels[out_dx + 3] = 0xFF;
+              }
+            }
+            
+            if (0x01 == bit) {
+              bit = 0x80;
+            }
+            else {
+              bit = bit >> 1;
+            }
+          } /* cols */
+        } /* rows */
+        
+        //rx_save_png("pointer.png", (unsigned char*)out_pixels, pointer_info.Width, pointer_info.Height / 2, 4, false);
+        //exit(0);
+      }
+      else if (DXGI_OUTDUPL_POINTER_SHAPE_TYPE_COLOR == pointer_info.Type
+               || DXGI_OUTDUPL_POINTER_SHAPE_TYPE_MASKED_COLOR == pointer_info.Type)
+        {
+        
+          uint32_t* pointer_in_pixels32 = (uint32_t*)(&pointer_in_pixels.front());
+          uint32_t* pointer_out_pixels32 = (uint32_t*)(&pointer_out_pixels.front());
+#if 0
+          for (int j = 0; j < pointer_info.Height; ++j) {
+            for (int i = 0; i < pointer_info.Width; ++i) {
+
+              uint32_t mask = 0xFF000000 & pointer_in_pixels32[i + j * (pointer_info.Pitch / sizeof(uint32_t))];
+            
+              if (0 != mask) {
+                /* This is where we should XOR with screen pixels. */
+                pointer_out_pixels32[j * pointer_info.Width + i] =  pointer_in_pixels32[i + j * (pointer_info.Pitch / sizeof(uint32_t))] | 0xFF000000;
+              }
+              else {
+                /* Similar as '0 != mask' as we don't have screen pixels. */
+                pointer_out_pixels32[j * pointer_info.Width + i] =  pointer_in_pixels32[i + j * (pointer_info.Pitch / sizeof(uint32_t))] | 0xFF000000;
+              }
+            }
+          }
+#endif          
+        rx_save_png("pointer_color.png", (unsigned char*)pointer_in_pixels32, pointer_info.Width, pointer_info.Height, 4, false);
+        exit(0);
+      }
+      else {
+        printf("Error: unsupported pointer type: %02X\n", pointer_info.Type);
+        exit(EXIT_FAILURE);
+      }
+            
+
+      printf("pointer_info.Type: %d\n", pointer_info.Type);
+      printf("pointer_info.Width: %d\n", pointer_info.Width);
+      printf("pointer_info.Height: %d\n", pointer_info.Height);
+      printf("pointer_info.Pitch: %d\n", pointer_info.Pitch);
+      printf("pointer_out_pixels.size(): %lu\n", pointer_out_pixels.size());
+      printf("pointer_out_pixels.capacity(): %lu\n", pointer_out_pixels.capacity());
+    }
     
+    return 0;
+    printf("info.LastMouseUpdateTime: %llu\n", info->LastMouseUpdateTime);                               /* A value of 0 indicates the mouse pointer wasn't changed. */
+    printf("info.PointerShapeBufferSize: %u\n", info->PointerShapeBufferSize);                           /* A non zero value indicates a change of mouse pointer. */
+    printf("info.PointerPosition.Position.x: %lu\n", info->PointerPosition.Position.x);
+    printf("info.PointerPosition.Position.y: %lu\n", info->PointerPosition.Position.y);
+    printf("info.PointerPosition.Visible: %c\n", info->PointerPosition.Visible ? 'y' : 'n');             /* Is also set to false when the user didn't move the mouse. */
     return 0;
   }
 

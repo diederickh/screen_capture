@@ -41,7 +41,7 @@ namespace sc {
     int getPixelFormats(std::vector<int>& formats);
 
   private:
-    int updateMouse(DGXI_OUTDUPL_FRAME_INFO* info);            /* Checks the current mouse info. */ 
+    int updateMouse(DXGI_OUTDUPL_FRAME_INFO* info);            /* Checks the current mouse info. */ 
 
   public:
     IDXGIFactory1* factory;                                    /* Used to create DXGI objects and e.g. enumerating adapters.*/
@@ -58,6 +58,8 @@ namespace sc {
     std::vector<IDXGIAdapter1*> adapters;                      /* An adapter represents a video card. We use it to retrieve the attached outputs (displays). */
     std::vector<IDXGIOutput*> outputs;                         /* The outputs we retrieved in init(). An IDXGIOutput represents an display/monitor. */
     std::vector<sc::Display*> displays;                        /* We collect the displays in init(). */
+    std::vector<uint8_t> pointer_in_pixels;
+    std::vector<uint8_t> pointer_out_pixels;
   }; 
 
   
