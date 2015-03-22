@@ -9,8 +9,8 @@ static const std::string D3D11_POINTER_SHADER = ""
   "SamplerState sam_linear: register(s0);\n"
   "\n"
   "cbuffer Cam : register(b0)  {\n"
-  "  matrix pm; \n"
-  "  matrix mm; \n"
+  "  row_major matrix pm; \n"
+  "  row_major matrix mm; \n"
   "};\n"
   "\n"
   "struct VertexInput {\n"
@@ -41,8 +41,8 @@ static const std::string D3D11_POINTER_SHADER = ""
 namespace sc {
 
   ScreenCapturePointerConstantBuffer::ScreenCapturePointerConstantBuffer() {
-    memset(pm, 0x00, sizeof(pm));
-    memset(mm, 0x00, sizeof(mm));
+    ZeroMemory(&pm, sizeof(pm));
+    ZeroMemory(&mm, sizeof(mm));
   }
   
   ScreenCapturePointerDirect3D11::ScreenCapturePointerDirect3D11()
@@ -216,22 +216,12 @@ namespace sc {
     }
     
     /* Create the vertex buffer. */
-#if 0    
     float vertices[] = {
-      -0.5f, -0.5f, 0.0f,  0.0f, 1.0f,   /* bottom left */
-      -0.5f,  0.5f, 0.0f,  0.0f, 0.0f,   /* top left */
-      0.5f, -0.5f, 0.0f,  1.0f, 1.0f,    /* bottom right */
-      0.5f,  0.5f, 0.0f,  1.0f, 0.0f     /* top right */
-    };
-#else
-    float vertices[] = {
-      0.0f, 0.0f, 0.0f,  0.0f, 1.0f,   /* bottom left */
-      0.0f, 1.0f, 0.0f,  0.0f, 0.0f,   /* top left */
+      0.0f, 0.0f, 0.0f,  0.0f, 1.0f,    /* bottom left */
+      0.0f, 1.0f, 0.0f,  0.0f, 0.0f,    /* top left */
       1.0f, 0.0f, 0.0f,  1.0f, 1.0f,    /* bottom right */
       1.0f, 1.0f, 0.0f,  1.0f, 0.0f     /* top right */
     };
-
-#endif
 
     int num_floats = 20;
 
@@ -281,6 +271,8 @@ namespace sc {
     desc.MiscFlags = 0;
     desc.StructureByteStride = 0;
 
+    printf(">>> %lu\n", sizeof(cbuffer));
+
     D3D11_SUBRESOURCE_DATA init_data;
     ZeroMemory(&init_data, sizeof(init_data));
     
@@ -325,38 +317,13 @@ namespace sc {
       return;
     }
 
-    printf("============= CURRENTLY ========================\n");
-    print_matrix(buffer_data->pm);
-    printf("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n");
+    /*
+      @todo this creates a frustum with bottom left as 0,0. Maybe it's
+       more logical to use top left as 0,0 but for now we keep this. 
+    */
+    buffer_data->pm = XMMatrixOrthographicOffCenterLH(0.0f, (float)vp.Width, 0.0f, (float)vp.Height, 0.0f, 100.0f);
+    buffer_data->mm = XMMatrixScaling(400.0f, 200.0f, 1.0f) * XMMatrixTranslation(100.0f, 50.0, 0.0) ;
 
-    create_identity_matrix(buffer_data->mm);
-    buffer_data->mm[0] = 100.25;
-    buffer_data->mm[5] = 100.5;
-    //    buffer_data->mm[10] = 1.0f;
-    //    buffer_data->mm[14] = 1.0f;
-
-    create_ortho_matrix(0, vp.Width, vp.Height, 0.0f,-0.1f, 100.0f, buffer_data->pm);
-
-    float* p = buffer_data->pm;
-    p[2] = -p[2];
-    p[6] = -p[6];
-    p[10] = -p[10];
-    p[14] = -p[14];
-
-    p = buffer_data->mm;
-    p[2] = -p[2];
-    p[6] = -p[6];
-    p[8] = -p[8];
-    p[9] = -p[9];
-    p[11] = -p[11];
-
-    
-    printf("Model Matrix.\n");
-    print_matrix(buffer_data->mm);
-    printf("Projection Matrix (ortho).\n");
-    print_matrix(buffer_data->pm);
-
-    printf("Updated: %f, %f\n", vp.Width, vp.Height);
     context->Unmap(constant_buffer, 0);
   }
 
@@ -395,7 +362,6 @@ namespace sc {
     context->Draw(4, 0);
   }
   
-  
   int ScreenCapturePointerDirect3D11::createPointerTexture() {
     return 0;
   }
@@ -413,9 +379,6 @@ namespace sc {
     COM_RELEASE(ps);
     COM_RELEASE(vs);
 
-    //memset(pm, 0x00, sizeof(pm));
-    //memset(mm, 0x00, sizeof(mm));
-    
     return 0;
   }
 

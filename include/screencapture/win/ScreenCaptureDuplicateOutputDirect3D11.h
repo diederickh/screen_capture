@@ -40,6 +40,9 @@ namespace sc {
     int getDisplays(std::vector<Display*>& result);
     int getPixelFormats(std::vector<int>& formats);
 
+  private:
+    int updateMouse(DGXI_OUTDUPL_FRAME_INFO* info);            /* Checks the current mouse info. */ 
+
   public:
     IDXGIFactory1* factory;                                    /* Used to create DXGI objects and e.g. enumerating adapters.*/
     ID3D11Device* device;                                      /* The device that we use to create graphics objects. */

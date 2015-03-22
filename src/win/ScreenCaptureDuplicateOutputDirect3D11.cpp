@@ -413,6 +413,7 @@ namespace sc {
       hr = frame->QueryInterface(__uuidof(ID3D11Texture2D), (void**)&frame_tex);
       
       if (S_OK == hr) {
+        updateMouse(&frame_info);
         transform.scale(frame_tex);
       }
     }
@@ -441,6 +442,18 @@ namespace sc {
       frame_tex->Release();
       frame_tex = NULL;
     }
+  }
+
+  int ScreenCaptureDuplicateOutputDirect3D11::updateMouse(DGXI_OUTDUPL_FRAME_INFO* info) {
+
+    if (NULL == info) {
+      printf("Error: requested to update the mouse info but the given info pointer is NULL.\n");
+      return -1;
+    }
+
+    printf("info.LastMouseUpdateTime: %llu\n", info->LastMouseUpdateTime);
+    
+    return 0;
   }
 
   int ScreenCaptureDuplicateOutputDirect3D11::stop() {
