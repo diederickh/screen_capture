@@ -36,7 +36,7 @@ cd build
 ## Compiling on Windows
 
 To compile from source on Windows, you need to make sure that you've installed
-cmake and that you're execute the following commands from a Git Bash.
+cmake and that you execute the following commands from a Git Bash.
 
 ````sh
 cd build
