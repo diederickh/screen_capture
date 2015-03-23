@@ -7,9 +7,11 @@ drivers (Windows / Linux) will be added. This is experimental code.
 
 ## Roadmap
 
+````sh
 [x] Mac Beta version ready (10.9.5 and 10.10.2)
 [x] Windows Beta version ready (Win 8.1)
 [ ] Linux researching...
+````
 
 ## Dependencies
 
