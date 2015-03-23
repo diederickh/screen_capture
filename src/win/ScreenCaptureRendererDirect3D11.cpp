@@ -33,7 +33,7 @@ namespace sc {
 
   /* ----------------------------------------------------------- */
 
-  ScaleColorTransformSettingsD3D11::ScaleColorTransformSettingsD3D11()
+  ScreenCaptureRendererSettingsDirect3D11::ScreenCaptureRendererSettingsDirect3D11()
     :device(NULL)
     ,context(NULL)
     ,output_width(0)
@@ -67,7 +67,7 @@ namespace sc {
     shutdown();
   }
 
-  int ScreenCaptureRendererDirect3D11::init(ScaleColorTransformSettingsD3D11 cfg) {
+  int ScreenCaptureRendererDirect3D11::init(ScreenCaptureRendererSettingsDirect3D11 cfg) {
 
     HRESULT hr = S_OK;
     ID3DBlob* vs_blob = NULL;

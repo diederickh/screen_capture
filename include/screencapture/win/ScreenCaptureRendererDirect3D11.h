@@ -9,14 +9,8 @@
   take this texture and scale it to a certain destination size and perform 
   color transforms (if necessary). 
 
-  ----------------------------------------------------------
-                  I M P O R T A N T 
-  ----------------------------------------------------------
-  This class is now actually drawing everything; we should 
-  rename it to something like 'ScreenCaptureDuplicateOutputDrawer'
-  because we scale, render the cursor, etc.. 
-  @todo rename 'ScreenCaptureScaleAndColorTransform'
-  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
+  @todo Check if XMMATRIX intrinsics are supported; there is a check for this in the D3D11 SDK. 
+
  */
 
 #ifndef SCREEN_CAPTURE_SCALE_TRANSFORM_DIRECT3D11_H
@@ -27,8 +21,8 @@
 #include <string>
 #include <stdint.h>
 #include <DXGI.h>
-#include <DXGI1_2.h>     /* For IDXGIOutput1 */
-#include <D3D11.h>       /* For the D3D11* interfaces. */
+#include <DXGI1_2.h>                                                   /* For IDXGIOutput1 */
+#include <D3D11.h>                                                     /* For the D3D11* interfaces. */
 #include <D3DCompiler.h>
 #include <screencapture/win/ScreenCaptureUtilsDirect3D11.h>
 #include <screencapture/win/ScreenCapturePointerDirect3D11.h>
@@ -39,9 +33,9 @@ namespace sc {
 
   /* ----------------------------------------------------------- */
   
-  class ScaleColorTransformSettingsD3D11 {
+  class ScreenCaptureRendererSettingsDirect3D11 {
   public:
-    ScaleColorTransformSettingsD3D11();
+    ScreenCaptureRendererSettingsDirect3D11();
     
   public:
     ID3D11Device* device;                                                /* Pointer to the D3D11 Device. */
@@ -58,12 +52,12 @@ namespace sc {
   public:
     ScreenCaptureRendererDirect3D11();
     ~ScreenCaptureRendererDirect3D11();
-    int init(ScaleColorTransformSettingsD3D11 cfg);                      /* Initializes the scale/transform features; creates textures etc.. */
+    int init(ScreenCaptureRendererSettingsDirect3D11 cfg);               /* Initializes the scale/transform/pointer features; creates textures etc.. */
     int shutdown();                                                      /* Cleans up; sets the device and context members to NULL. */
     int scale(ID3D11Texture2D* tex);                                     /* Scale the given texture to the output_width and output_height of the settings passed into init(). */
     int isInit();                                                        /* Returns 0 when we're initialized. */
-    int updatePointerPixels(int w, int h, uint8_t* pixels);              /* */
-    void updatePointerPosition(float x, float y);
+    int updatePointerPixels(int w, int h, uint8_t* pixels);              /* Update the pixels of the pointer; pixels is in the BGRA format.*/
+    void updatePointerPosition(float x, float y);                        /* Update the pointer position; the X and Y should be in the original coordinates as they appear on your screen; so no scaling! */
     
   private:
     HRESULT createVertexBuffer();                                        /* Creates the full screen vertex buffer to render the texture. */
@@ -83,8 +77,8 @@ namespace sc {
     ID3D11InputLayout* input_layout;                                     /* The input layout that defines our vertex buffer. */
     ID3D11Buffer* vertex_buffer;                                         /* The Position + Texcoord vertex buffer. */
     ID3D11BlendState* blend_state;                                       /* We use alpha blending to merge the pointer texture. */
-    D3D11_VIEWPORT scale_viewport;
-    ScaleColorTransformSettingsD3D11 settings;                           /* We copy the settings that are passed into init(). */
+    D3D11_VIEWPORT scale_viewport;                                       /* The viewport which represents the size of the output render. This most like a scaled down version of the desktop. e.g. when your desktop is 1680x1050 the viewport will be rescaled so that it fits the output size of the capture. */
+    ScreenCaptureRendererSettingsDirect3D11 settings;                    /* We copy the settings that are passed into init(). */
     ScreenCapturePointerDirect3D11 pointer;                              /* Takes care of drawing the pointer. */
   }; 
 

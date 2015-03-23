@@ -18,7 +18,7 @@
 #include <D3D11.h>   /* For the D3D11* interfaces. */
 #include <screencapture/Types.h>
 #include <screencapture/Base.h>
-#include <screencapture/win/ScreenCaptureScaleAndColorTransformDirect3D11.h>
+#include <screencapture/win/ScreenCaptureRendererDirect3D11.h>
 
 namespace sc {
 
@@ -52,7 +52,7 @@ namespace sc {
     IDXGIOutputDuplication* duplication;                       /* The duplication object, set in configure(). */
     DXGI_OUTDUPL_FRAME_INFO frame_info;                        /* Information about the frame, in update(). */
     IDXGIResource* frame;                                      /* The captured frame, in update(). */
-    ScreenCaptureScaleAndColorTransformDirect3D11 transform;   /* The object which transforms the received frame into the desired output. */
+    ScreenCaptureRendererDirect3D11 renderer;                  /* The object which transforms the received frame into the desired output. */
     PixelBuffer pixel_buffer;                                  /* The pixel buffer that we pass into the callback. */
     bool has_frame;                                            /* Is set to true when we acquired a next frame in Release(). According to the docs it's best to keep access to the required frame and release it just before calling AcquireNextFrame(). See the remarks here https://msdn.microsoft.com/en-us/library/windows/desktop/hh404623(v=vs.85).aspx */
     std::vector<IDXGIAdapter1*> adapters;                      /* An adapter represents a video card. We use it to retrieve the attached outputs (displays). */

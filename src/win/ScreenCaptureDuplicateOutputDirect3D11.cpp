@@ -188,7 +188,7 @@ namespace sc {
 
     has_frame = false;
     
-    if (0 != transform.shutdown()) {
+    if (0 != renderer.shutdown()) {
       r -= 1;
     }
 
@@ -284,15 +284,15 @@ namespace sc {
     pixel_buffer.user = user;
     
     /*
-      When the transform is already initialized, we first deallocate/release
+      When the renderer is already initialized, we first deallocate/release
        all created objects that are used to perform the scaling. 
     */
-    if (0 == transform.isInit()) {
-      transform.shutdown();
+    if (0 == renderer.isInit()) {
+      renderer.shutdown();
     }
 
     /* We can only initialize the transform, after we know the output width/height. */
-    ScaleColorTransformSettingsD3D11 trans_cfg;
+    ScreenCaptureRendererSettingsDirect3D11 trans_cfg;
     trans_cfg.device = device;
     trans_cfg.context = context;
     trans_cfg.output_width = cfg.output_width;
@@ -300,7 +300,7 @@ namespace sc {
     trans_cfg.cb_scaled = on_scaled_pixels;
     trans_cfg.cb_user = this;
     
-    if (0 != transform.init(trans_cfg)) {
+    if (0 != renderer.init(trans_cfg)) {
       printf("Error: failed to initialize the tansform for the screen capture.\n");
       return -5;
     }
@@ -417,7 +417,7 @@ namespace sc {
       
       if (S_OK == hr) {
         updateMouse(&frame_info);
-        transform.scale(frame_tex);
+        renderer.scale(frame_tex);
       }
     }
 #if !defined(NDEBUG)    
@@ -475,7 +475,7 @@ namespace sc {
       return 0;
     }
 
-    transform.updatePointerPosition(info->PointerPosition.Position.x, info->PointerPosition.Position.y);
+    renderer.updatePointerPosition(info->PointerPosition.Position.x, info->PointerPosition.Position.y);
 
     /* A non-zero value indicates a new pointer shape. */
     if (0ull != info->PointerShapeBufferSize) {
@@ -599,7 +599,7 @@ namespace sc {
         exit(EXIT_FAILURE);
       }
 
-      if (0 != transform.updatePointerPixels(img_width, img_height, &pointer_out_pixels.front())) {
+      if (0 != renderer.updatePointerPixels(img_width, img_height, &pointer_out_pixels.front())) {
         printf("Error: failed to update the pointer pixels.\n");
         return -2;
       }
