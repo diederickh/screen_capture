@@ -1,10 +1,10 @@
 /*-*-c++-*-*/
 /*
 
-  Screen Capture Scale and Color Transform for Direct 3D 11.
+  Render the Captured Screen into a offscreen buffer.
   ----------------------------------------------------------
 
-  The 'ScreenCaptureDuplicateOutputDirect3D11' class receives frames with a 
+  The 'ScreenCaptureRenderDirect3D11' class receives frames with a 
   reference to the 2D texture. This class is designed about the idea that we
   take this texture and scale it to a certain destination size and perform 
   color transforms (if necessary). 
