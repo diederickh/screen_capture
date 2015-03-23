@@ -55,6 +55,7 @@
 #ifndef SCREENCAPTURE_OPENGL_H
 #define SCREENCAPTURE_OPENGL_H
 
+#include <math.h>
 #include <assert.h>
 #include <screencapture/ScreenCapture.h>
 #include <screencapture/Utils.h>

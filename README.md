@@ -7,9 +7,9 @@ drivers (Windows / Linux) will be added. This is experimental code.
 
 ## Roadmap
 
-Currently I'm working on driver for Windows and Linux. The Mac
-driver has been tested on just two Macs, a 10.9.5 and 10.10.2. Please let
-me know when you've compiled and run this library successfully.
+[x] Mac Beta version ready (10.9.5 and 10.10.2)
+[x] Windows Beta version ready (Win 8.1)
+[ ] Linux researching...
 
 ## Dependencies
 
@@ -21,7 +21,7 @@ me know when you've compiled and run this library successfully.
  - A working C/C++ compiler :) 
 
 
-## Compiling on Mac
+## Compiling on Mac 
 
 Execute the following in a terminal which will start the opengl 
 test application that captures from the first display:
@@ -30,6 +30,17 @@ test application that captures from the first display:
 cd build
 ./release 64
 ````
+
+## Compiling on Windows
+
+To compile from source on Windows, you need to make sure that you've installed
+cmake and that you're execute the following commands from a Git Bash.
+
+````sh
+cd build
+./release 64
+````
+
 
 
   
