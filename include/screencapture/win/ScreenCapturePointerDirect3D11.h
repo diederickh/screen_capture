@@ -25,6 +25,7 @@
 #ifndef SCREEN_CAPTURE_POINTER_DIRECT3D11_H
 #define SCREEN_CAPTURE_POINTER_DIRECT3D11_H
 
+#include <vector>
 #include <DXGI.h>
 #include <D3D11.h>       /* For the D3D11* interfaces. */
 #include <D3DCompiler.h>
@@ -35,14 +36,25 @@ using namespace DirectX;
 
 namespace sc {
 
-  class ScreenCapturePointerConstantBuffer {
-  public:
-    ScreenCapturePointerConstantBuffer();
-  public:
-    XMMATRIX pm;                                                     /* The ortho graphic projection matrix. */
-    XMMATRIX mm;                                                     /* The model matrix. */
-  };
+  /* ----------------------------------------------------------- */
 
+  class ScreenCapturePointerTextureDirect3D11 {
+  public:
+    ScreenCapturePointerTextureDirect3D11(ID3D11Device* device, ID3D11DeviceContext* context);
+    ~ScreenCapturePointerTextureDirect3D11();
+    int updatePixels(int w, int h, uint8_t* pixels);
+
+  public:
+    int width;
+    int height;
+    ID3D11Device* device;
+    ID3D11DeviceContext* context;
+    ID3D11Texture2D* texture;
+    ID3D11ShaderResourceView* view;
+  };
+  
+  /* ----------------------------------------------------------- */
+  
   class ScreenCapturePointerDirect3D11 {
   public:
     ScreenCapturePointerDirect3D11();
@@ -51,11 +63,13 @@ namespace sc {
     int shutdown();
     void draw();
     void setViewport(D3D11_VIEWPORT vp);                             /* Must be called whenever the viewport changes so we can update the orthographic matrix. */
+    void setScale(float sx, float sy); /* The viewport scale; needs to be used to scale the pointer.*/
+    int updatePointerPixels(int w, int h, uint8_t* pixels);          /* Change the texture data of the pointer we need to draw. */
+    void updatePointerPosition(float x, float y);
     
   private:
     int createShadersAndBuffers();                                   /* Creates the VS and PS shader + vertex buffer, layout. */
     int createVertexBuffer();                                        /* Creates the vertex buffer. */
-    int createPointerTexture();                                      /* Creates the texture for the pointer. */
     int createConstantBuffer();
 
   public:
@@ -65,11 +79,22 @@ namespace sc {
     ID3D11ShaderResourceView* pointer_view;
     ID3D11InputLayout* input_layout;
     ID3D11Buffer* vertex_buffer;
-    ID3D11Buffer* constant_buffer;
+    ID3D11Buffer* conb_pm;
+    ID3D11Buffer* conb_mm;
     ID3D11PixelShader* ps;
     ID3D11VertexShader* vs;
-    ScreenCapturePointerConstantBuffer cbuffer;
+    float sx; /* x scale of the resized viewport, used to scale the pointer. */
+    float sy;
+    float vp_height;
+    float vp_width;
+    ScreenCapturePointerTextureDirect3D11* curr_pointer;
+    std::vector<ScreenCapturePointerTextureDirect3D11*> pointers;   /* The pointers; we create a different texture whenever the width/height of a pointer changes.*/
   };
+
+  inline void ScreenCapturePointerDirect3D11::setScale(float xscale, float yscale) {
+    sx = xscale;
+    sy = yscale;
+  }
   
 } /* namespace sc */
 

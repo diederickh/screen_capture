@@ -8,8 +8,10 @@ static const std::string D3D11_POINTER_SHADER = ""
   "Texture2D tex_source: register(t0);\n"
   "SamplerState sam_linear: register(s0);\n"
   "\n"
-  "cbuffer Cam : register(b0)  {\n"
+  "cbuffer Projection : register(b0)  {\n"
   "  row_major matrix pm; \n"
+  "};\n"
+  "cbuffer ModelMatrix : register(b1) {\n"
   "  row_major matrix mm; \n"
   "};\n"
   "\n"
@@ -34,16 +36,124 @@ static const std::string D3D11_POINTER_SHADER = ""
   "}\n"
   "\n"
   "float4 pixel_shader(PixelInput input) : SV_Target {\n"
-  "  return float4(input.tex.x, input.tex.y, 0.0, 1.0);\n"
   "  return tex_source.Sample(sam_linear, input.tex);\n"
   "}\n";
 
 namespace sc {
 
-  ScreenCapturePointerConstantBuffer::ScreenCapturePointerConstantBuffer() {
-    ZeroMemory(&pm, sizeof(pm));
-    ZeroMemory(&mm, sizeof(mm));
+  /* ----------------------------------------------------------- */
+
+  ScreenCapturePointerTextureDirect3D11::ScreenCapturePointerTextureDirect3D11(ID3D11Device* device, ID3D11DeviceContext* context)
+    :width(0)
+    ,height(0)
+    ,device(device)
+    ,context(context)
+    ,texture(NULL)
+    ,view(NULL)
+  {
   }
+  
+  ScreenCapturePointerTextureDirect3D11::~ScreenCapturePointerTextureDirect3D11() {
+
+    COM_RELEASE(view);
+    COM_RELEASE(texture);
+    
+    width = 0;
+    height = 0;
+    device = NULL;
+    context = NULL;
+  }
+
+  int ScreenCapturePointerTextureDirect3D11::updatePixels(int w, int h, uint8_t* pixels) {
+
+    HRESULT hr = S_OK;
+    
+    if (0 >= w) {
+      printf("Error: the given width for the pointer texture is 0.\n");
+      return -1;
+    }
+
+    if (0 >= h) {
+      printf("Error: the given height for the pointer texture is 0.\n");
+      return -2;
+    }
+
+    if (0 != width && w != width) {
+      printf("Error: cannot update the pointer texture; the width doesn't match the texture width.\n");
+      return -3;
+    }
+
+    if (0 != height && h != height) {
+      printf("Error: cannot update the pointer texture; the height doesn't match the texture height.\n");
+      return -4;
+    }
+
+    if (NULL == device) {
+      printf("Error: cannot update the pointer texture; the D3D11 Device member is NULL.\n");
+      return -5;
+    }
+
+    if (NULL == context) {
+      printf("Error: cannot update the pointer texture; the D3D11 Device Context member is NULL.\n");
+      return -6;
+    }
+
+    /* Create the texture when we didn't create it yet. */
+    if (NULL == texture) {
+
+      D3D11_SUBRESOURCE_DATA data;
+      ZeroMemory(&data, sizeof(data));
+      data.pSysMem = pixels;
+      data.SysMemPitch = 4 * w;
+      data.SysMemSlicePitch = 0;
+      
+      D3D11_TEXTURE2D_DESC desc;
+      ZeroMemory(&desc, sizeof(desc));
+      desc.Width = w;
+      desc.Height = h;
+      desc.MipLevels = 1;
+      desc.ArraySize = 1;
+      desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;                               /* This is the default data when using desktop duplication, see https://msdn.microsoft.com/en-us/library/windows/desktop/hh404611(v=vs.85).aspx */
+      desc.SampleDesc.Count = 1;
+      desc.SampleDesc.Quality = 0;
+      desc.Usage = D3D11_USAGE_DYNAMIC;
+      desc.BindFlags = D3D11_BIND_SHADER_RESOURCE; 
+      desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE; 
+      desc.MiscFlags = 0;
+
+      hr = device->CreateTexture2D(&desc, &data, &texture);
+      if (S_OK != hr) {
+        printf("Error: failed to create the pointer texture.\n");
+        return -5;
+      }
+
+      hr = device->CreateShaderResourceView(texture, NULL, &view);
+      if (S_OK != hr) {
+        printf("Error: failed to create the pointer shader resource view.\n");
+        COM_RELEASE(texture);
+        return -6;
+      }
+    }
+    else {
+      
+      D3D11_MAPPED_SUBRESOURCE map;
+      hr = context->Map(texture, 0, D3D11_MAP_WRITE_DISCARD, 0, &map);
+      if (S_OK != hr) {
+        printf("Error: failed to map the pointer texture.\n");
+        return -7;
+      }
+
+      memcpy(map.pData, pixels, w * h * 4);
+      context->Unmap(texture, 0);
+    }
+
+    width = w;
+    height = h;
+
+    return 0;
+  }
+
+  /* ----------------------------------------------------------- */
   
   ScreenCapturePointerDirect3D11::ScreenCapturePointerDirect3D11()
     :device(NULL)
@@ -52,9 +162,15 @@ namespace sc {
     ,pointer_view(NULL)
     ,input_layout(NULL)
     ,vertex_buffer(NULL)
-    ,constant_buffer(NULL)
+    ,conb_pm(NULL)
+    ,conb_mm(NULL)
     ,ps(NULL)
     ,vs(NULL)
+    ,sx(1.0f)
+    ,sy(1.0f)
+    ,vp_width(0.0f)
+    ,vp_height(0.0f)
+    ,curr_pointer(NULL)
   {
   }
 
@@ -256,113 +372,208 @@ namespace sc {
       return -1;
     }
 
-    if (NULL != constant_buffer) {
-      printf("Error: requested to create the constant buffer but it's already created; call shutdown() first.\n");
+    if (NULL != conb_pm) {
+      printf("Error: requested to create the constant buffer for the pm, but it's already created.\n");
       return -2;
     }
-
-    D3D11_BUFFER_DESC desc;
-    ZeroMemory(&desc, sizeof(desc));
-
-    desc.ByteWidth = sizeof(cbuffer);
-    desc.Usage = D3D11_USAGE_DYNAMIC;
-    desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    desc.MiscFlags = 0;
-    desc.StructureByteStride = 0;
-
-    printf(">>> %lu\n", sizeof(cbuffer));
-
-    D3D11_SUBRESOURCE_DATA init_data;
-    ZeroMemory(&init_data, sizeof(init_data));
     
-    init_data.pSysMem = &cbuffer;
-    init_data.SysMemPitch = 0;
-    init_data.SysMemSlicePitch = 0;
-
-    HRESULT hr;
-    hr = device->CreateBuffer(&desc, &init_data, &constant_buffer);
-    if (S_OK != hr) {
-      printf("Error: failed to create the constant buffer for the pointer drawer.\n");
+    if (NULL != conb_mm) {
+      printf("Error: requested to create the constant buffer for the mm, but it's already created.\n");
       return -3;
+    }
+
+    /* Create constant buffer for projection matrix. */
+    {
+      D3D11_BUFFER_DESC desc;
+      ZeroMemory(&desc, sizeof(desc));
+
+      desc.ByteWidth = sizeof(XMMATRIX);
+      desc.Usage = D3D11_USAGE_DEFAULT;
+      desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+      desc.CPUAccessFlags = 0;
+      desc.MiscFlags = 0;
+      desc.StructureByteStride = 0;
+
+      HRESULT hr;
+      hr = device->CreateBuffer(&desc, NULL, &conb_pm);
+      if (S_OK != hr) {
+        printf("Error: failed to create the constant buffer for the projection matrix.\n");
+        return -3;
+      }
+    }
+
+    /* Create constant buffer for model matrix. */
+    {
+      D3D11_BUFFER_DESC desc;
+      ZeroMemory(&desc, sizeof(desc));
+
+      desc.ByteWidth = sizeof(XMMATRIX);
+      desc.Usage = D3D11_USAGE_DEFAULT;
+      desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+      desc.CPUAccessFlags = 0;
+      desc.MiscFlags = 0;
+      desc.StructureByteStride = 0;
+
+      HRESULT hr;
+      hr = device->CreateBuffer(&desc, NULL, &conb_mm);
+      if (S_OK != hr) {
+        printf("Error: failed to create the constant buffer for the projection matrix.\n");
+        return -3;
+      }
     }
     
     return 0;
   }
 
   void ScreenCapturePointerDirect3D11::setViewport(D3D11_VIEWPORT vp) {
-    
-    if (NULL == constant_buffer) {
-      printf("Error: cannot set the viewport and update the projection matrix because the constant buffer is NULL in the pointer drawer.\n");
-      exit(EXIT_FAILURE);
-    }
+
     if (NULL == context) {
       printf("Error: cannot set the viewport and update the projection matrix because the context is NULL.\n");
       exit(EXIT_FAILURE);
     }
-    
-    D3D11_MAPPED_SUBRESOURCE map;
-    HRESULT hr;
 
-    hr = context->Map(constant_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &map);
-    if (S_OK != hr) {
-      printf("Error: failed to map the constant buffer that we use to draw the pointer.\n");
+    if (NULL == conb_pm) {
+      printf("Error: cannot set the projection matrix because the constant buffer for it is NULL.\n");
       exit(EXIT_FAILURE);
     }
 
-    ScreenCapturePointerConstantBuffer* buffer_data = static_cast<ScreenCapturePointerConstantBuffer*>(map.pData);
-    if (NULL == buffer_data) {
-      printf("Error: failed to cast the mapped constant buffer to our internal representation. Not supposed to happen.\n");
-      context->Unmap(constant_buffer, 0);
-      return;
+    if (NULL == conb_mm) {
+      printf("Error: cannot set the model matrix because the constant buffer for it is NULL.\n");
+      exit(EXIT_FAILURE);
     }
 
-    /*
-      @todo this creates a frustum with bottom left as 0,0. Maybe it's
-       more logical to use top left as 0,0 but for now we keep this. 
-    */
-    buffer_data->pm = XMMatrixOrthographicOffCenterLH(0.0f, (float)vp.Width, 0.0f, (float)vp.Height, 0.0f, 100.0f);
-    buffer_data->mm = XMMatrixScaling(400.0f, 200.0f, 1.0f) * XMMatrixTranslation(100.0f, 50.0, 0.0) ;
+    vp_width = vp.Width;
+    vp_height = vp.Height;
 
-    context->Unmap(constant_buffer, 0);
+    /* 
+       Placing the matrix on the stack so it's 16bit aligned which is necessary: 
+       https://msdn.microsoft.com/en-us/library/windows/desktop/ee418725(v=vs.85).aspx 
+    */
+    XMMATRIX m = XMMatrixOrthographicOffCenterLH(0.0f, (float)vp.Width, 0.0f, (float)vp.Height, 0.0f, 100.0f);
+    context->UpdateSubresource(conb_pm, 0, NULL, &m, 0, 0);
+    
+    m = XMMatrixScaling(32.0f * sx , 32.0f * sy, 1.0f) * XMMatrixTranslation(100.0f, 50.0, 0.0) ;
+    context->UpdateSubresource(conb_mm, 0, NULL, &m, 0, 0);
+  }
+
+  void ScreenCapturePointerDirect3D11::updatePointerPosition(float x, float y) {
+
+#if !defined(NDEBUG)
+    if (NULL == conb_mm) {
+      printf("Error: failed to update the pointer position; the constant buffer is NULL.\n");
+      return;
+    }
+    
+    if (NULL == context) {
+      printf("Error: failed to update the pointer position; the context is NULL.\n");
+      return;
+    }
+#endif
+    
+    if (NULL == curr_pointer) {
+      return;
+    }
+    
+    /* 
+       Placing the matrix on the stack so it's 16bit aligned which is necessary: 
+       https://msdn.microsoft.com/en-us/library/windows/desktop/ee418725(v=vs.85).aspx 
+    */
+    XMMATRIX m = XMMatrixScaling(curr_pointer->width * sx, curr_pointer->height * sy, 1.0f) * XMMatrixTranslation((int)(sx * x), (int)(vp_height -(y * sy) -(sy * curr_pointer->height)) , 0.0) ;
+    context->UpdateSubresource(conb_mm, 0, NULL, &m, 0, 0);
   }
 
   void ScreenCapturePointerDirect3D11::draw() {
 
-    if (NULL == constant_buffer) {
-      printf("Error: constant buffer is NULL.\n");
+#if !defined(NDEBUG)
+      
+    if (NULL == conb_pm) {
+      printf("Error: conb_mm is NULL.\n");
       return;
     }
+    
+    if (NULL == conb_mm) {
+      printf("Error: conb_mm is NULL.\n");
+      return;
+    }
+
     if (NULL == vertex_buffer) {
       printf("Error: vertex buffer is NULL.\n");
       return;
     }
+    
     if (NULL == input_layout) {
       printf("Error: input layout is NULL.\n");
       return;
     }
+    
     if (NULL == ps) {
       printf("Error: ps is NULL.\n");
       return;
     }
+    
     if (NULL == vs) {
       printf("Error: vs is NULL.\n");
       return;
+    }
+#endif
+    
+    if (NULL != curr_pointer) {
+      context->PSSetShaderResources(0, 1, &curr_pointer->view);
     }
      
     /* Set vertex layout and buffer. */
     UINT stride = sizeof(float) * 5; 
     UINT offset = 0;
-    
+
     context->IASetInputLayout(input_layout);
     context->IASetVertexBuffers(0, 1, &vertex_buffer, &stride, &offset);
-    context->VSSetConstantBuffers(0, 1, &constant_buffer);
+    context->VSSetConstantBuffers(0, 1, &conb_pm);
+    context->VSSetConstantBuffers(1, 1, &conb_mm);
     context->VSSetShader(vs, NULL, 0);
     context->PSSetShader(ps, NULL, 0);
     context->Draw(4, 0);
   }
-  
-  int ScreenCapturePointerDirect3D11::createPointerTexture() {
+
+  int ScreenCapturePointerDirect3D11::updatePointerPixels(int w, int h, uint8_t* pixels) {
+    
+    if (0 >= w) {
+      printf("Error: cannot update the pointer pixels because the width is invalid: %d\n", w);
+      return -1;
+    }
+
+    if (0 >= h) {
+      printf("Error: cannot update the pointer pixels because the height is invalid: %d\n", h);
+      return -2;
+    }
+
+    if (NULL == pixels) {
+      printf("Error: cannot update the pointer pixels because the given pixels are NULL.\n");
+      return -3;
+    }
+
+    /* Find the texture. */
+    ScreenCapturePointerTextureDirect3D11* tex = NULL;
+    for (size_t i = 0; i < pointers.size(); ++i) {
+      tex = pointers[i];
+      if (tex->width == w && tex->height == h) {
+        break;
+      }
+      tex = NULL;
+    }
+
+    if (NULL == tex) {
+      printf("Info: creating a new pointer texture.\n");
+      tex = new ScreenCapturePointerTextureDirect3D11(device, context);
+      pointers.push_back(tex);
+    }
+
+    if (0 != tex->updatePixels(w, h, pixels)) {
+      printf("Error: failed to update the pointer pixels.\n");
+      return -4;
+    }
+
+    curr_pointer = tex;
+    
     return 0;
   }
 
@@ -370,17 +581,22 @@ namespace sc {
 
     device = NULL;
     context = NULL;
+    curr_pointer = NULL;
+
+    for (size_t i = 0; i < pointers.size(); ++i) {
+      delete pointers[i];
+      pointers[i] = NULL;
+    }
+    pointers.clear();
 
     COM_RELEASE(pointer_tex);
     COM_RELEASE(pointer_view);
     COM_RELEASE(input_layout);
     COM_RELEASE(vertex_buffer);
-    COM_RELEASE(constant_buffer);
+    COM_RELEASE(conb_pm);
+    COM_RELEASE(conb_mm);
     COM_RELEASE(ps);
     COM_RELEASE(vs);
-
     return 0;
   }
-
-  
 } /* namespace sc */

@@ -24,7 +24,9 @@ static const std::string D3D11_SCALE_SHADER = ""
   "}\n"
   "\n"
   "float4 pixel_shader(PixelInput input) : SV_Target {\n"
-  "  return tex_source.Sample(sam_linear, input.tex);\n"
+  "  float4 pix = tex_source.Sample(sam_linear, input.tex);\n"
+  "  pix.a = 1.0;\n"
+  "  return pix;\n;"
   "}\n";
 
 namespace sc {
@@ -56,6 +58,7 @@ namespace sc {
     ,ps_scale(NULL)
     ,input_layout(NULL)
     ,vertex_buffer(NULL)
+    ,blend_state(NULL)
   {
 
   }
@@ -195,6 +198,27 @@ namespace sc {
       }
     } /* End: vertex input layout. */
 
+    /* Create the blend state. */
+    {
+      D3D11_BLEND_DESC desc;
+      ZeroMemory(&desc, sizeof(desc));
+
+      desc.RenderTarget[0].BlendEnable = TRUE;
+      desc.RenderTarget[0].SrcBlend	= D3D11_BLEND_SRC_ALPHA;
+      desc.RenderTarget[0].DestBlend = D3D11_BLEND_INV_SRC_ALPHA;
+      desc.RenderTarget[0].BlendOp = D3D11_BLEND_OP_ADD;
+      desc.RenderTarget[0].SrcBlendAlpha = D3D11_BLEND_ONE;
+      desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ZERO;
+      desc.RenderTarget[0].BlendOpAlpha = D3D11_BLEND_OP_ADD;
+      desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+
+      hr = device->CreateBlendState(&desc, &blend_state);
+      if (S_OK != hr) {
+        printf("Error: failed to create the blend state.\n");
+        goto error;
+      }
+    }
+
     /* Create the vertex buffer. */
     hr = createVertexBuffer();
     if (S_OK != hr) {
@@ -222,6 +246,7 @@ namespace sc {
     COM_RELEASE(vs_err);
     COM_RELEASE(vs_scale);
     COM_RELEASE(input_layout);
+    COM_RELEASE(blend_state);
     return hr;
   }
 
@@ -475,6 +500,7 @@ namespace sc {
         scale_viewport.Height = scale_ratio * desc.Height;
 
         pointer.setViewport(scale_viewport);
+        pointer.setScale(scale_viewport.Width / desc.Width,scale_viewport.Height / desc.Height);
       }
 
       D3D11_SHADER_RESOURCE_VIEW_DESC desc;
@@ -495,7 +521,11 @@ namespace sc {
     /* Set vertex layout and buffer. */
     UINT stride = sizeof(float) * 5; /* @todo I guess it's better to make this a member so we can set it where we create the vertex buffer. */
     UINT offset = 0;
-    
+    //float blend_factor[] = {0.5f, 0.5f, 0.5f, 1.0f};
+    float blend_factor[] = {1.0f, 1.0f, 1.0f, 1.0f};
+    float col[] = {0.0f, 0.0f, 0.0f, 1.0f};
+    //context->ClearRenderTargetView(dest_target_view, col);
+
     context->IASetInputLayout(input_layout);
     context->IASetVertexBuffers(0, 1, &vertex_buffer, &stride, &offset);
     context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -505,6 +535,7 @@ namespace sc {
     context->PSSetShaderResources(0, 1, &src_tex_view);
     context->RSSetViewports(1, &scale_viewport);
     context->OMSetRenderTargets(1, &dest_target_view, NULL);
+    context->OMSetBlendState(blend_state, blend_factor, 0xFFFFFF);
     context->Draw(4, 0);
 
     pointer.draw();
@@ -552,6 +583,7 @@ namespace sc {
     COM_RELEASE(vs_scale);
     COM_RELEASE(input_layout);
     COM_RELEASE(vertex_buffer);
+    COM_RELEASE(blend_state);
 
     if (0 != pointer.shutdown()) {
       r -= 1;

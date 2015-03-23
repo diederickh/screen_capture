@@ -62,6 +62,8 @@ namespace sc {
     int shutdown();                                                      /* Cleans up; sets the device and context members to NULL. */
     int scale(ID3D11Texture2D* tex);                                     /* Scale the given texture to the output_width and output_height of the settings passed into init(). */
     int isInit();                                                        /* Returns 0 when we're initialized. */
+    int updatePointerPixels(int w, int h, uint8_t* pixels);              /* */
+    void updatePointerPosition(float x, float y);
     
   private:
     HRESULT createVertexBuffer();                                        /* Creates the full screen vertex buffer to render the texture. */
@@ -80,6 +82,7 @@ namespace sc {
     ID3D11VertexShader* vs_scale;                                        /* Vertex shader, used to scale. */
     ID3D11InputLayout* input_layout;                                     /* The input layout that defines our vertex buffer. */
     ID3D11Buffer* vertex_buffer;                                         /* The Position + Texcoord vertex buffer. */
+    ID3D11BlendState* blend_state;                                       /* We use alpha blending to merge the pointer texture. */
     D3D11_VIEWPORT scale_viewport;
     ScaleColorTransformSettingsD3D11 settings;                           /* We copy the settings that are passed into init(). */
     ScreenCapturePointerDirect3D11 pointer;                              /* Takes care of drawing the pointer. */
@@ -89,6 +92,14 @@ namespace sc {
 
   inline int ScreenCaptureScaleAndColorTransformDirect3D11::isInit() {
     return is_init;
+  }
+
+  inline int ScreenCaptureScaleAndColorTransformDirect3D11::updatePointerPixels(int w, int h, uint8_t* pixels) {
+    return pointer.updatePointerPixels(w, h, pixels);
+  }
+
+  inline void ScreenCaptureScaleAndColorTransformDirect3D11::updatePointerPosition(float x, float y) {
+    pointer.updatePointerPosition(x, y);
   }
   
 } /* namespace sc */
