@@ -2,9 +2,6 @@
 #include <screencapture/win/ScreenCaptureDuplicateOutputDirect3D11.h>
 #include <screencapture/win/ScreenCaptureUtilsDirect3D11.h>
 
-#define ROXLU_USE_PNG
-#include <tinylib.h>
-
 namespace sc {
 
   /* ----------------------------------------------------------- */
@@ -25,8 +22,6 @@ namespace sc {
     ZeroMemory(&output_desc, sizeof(output_desc));
     ZeroMemory(&frame_info, sizeof(frame_info));
   }
-  
-  /* @todo - fix return values. */
   
   int ScreenCaptureDuplicateOutputDirect3D11::init() {
 
