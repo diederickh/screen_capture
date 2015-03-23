@@ -1,4 +1,4 @@
-#include <screencapture/win/ScreenCaptureScaleAndColorTransformDirect3D11.h>
+#include <screencapture/win/ScreenCaptureRendererDirect3D11.h>
 #include <screencapture/win/ScreenCaptureUtilsDirect3D11.h>
 #include <algorithm>
 
@@ -45,7 +45,7 @@ namespace sc {
   
   /* ----------------------------------------------------------- */
 
-  ScreenCaptureScaleAndColorTransformDirect3D11::ScreenCaptureScaleAndColorTransformDirect3D11()
+  ScreenCaptureRendererDirect3D11::ScreenCaptureRendererDirect3D11()
     :is_init(-1)
     ,device(NULL)
     ,context(NULL)
@@ -63,11 +63,11 @@ namespace sc {
 
   }
 
-  ScreenCaptureScaleAndColorTransformDirect3D11::~ScreenCaptureScaleAndColorTransformDirect3D11() {
+  ScreenCaptureRendererDirect3D11::~ScreenCaptureRendererDirect3D11() {
     shutdown();
   }
 
-  int ScreenCaptureScaleAndColorTransformDirect3D11::init(ScaleColorTransformSettingsD3D11 cfg) {
+  int ScreenCaptureRendererDirect3D11::init(ScaleColorTransformSettingsD3D11 cfg) {
 
     HRESULT hr = S_OK;
     ID3DBlob* vs_blob = NULL;
@@ -250,7 +250,7 @@ namespace sc {
     return hr;
   }
 
-  HRESULT ScreenCaptureScaleAndColorTransformDirect3D11::createVertexBuffer() {
+  HRESULT ScreenCaptureRendererDirect3D11::createVertexBuffer() {
     
     HRESULT hr = S_OK;
 
@@ -293,7 +293,7 @@ namespace sc {
     return hr;
   }
 
-  HRESULT ScreenCaptureScaleAndColorTransformDirect3D11::createDestinationObjects() {
+  HRESULT ScreenCaptureRendererDirect3D11::createDestinationObjects() {
     
     HRESULT hr = S_OK;
 
@@ -428,7 +428,7 @@ namespace sc {
      sure that when we add other state changes in the future, this will still
      work.
   */
-  int ScreenCaptureScaleAndColorTransformDirect3D11::scale(ID3D11Texture2D* tex) {
+  int ScreenCaptureRendererDirect3D11::scale(ID3D11Texture2D* tex) {
 
     if (NULL == tex) {
       printf("Error: cannot scale because the given tex pointer is NULL.\n");
@@ -565,7 +565,7 @@ namespace sc {
     return 0;
   }
 
-  int ScreenCaptureScaleAndColorTransformDirect3D11::shutdown() {
+  int ScreenCaptureRendererDirect3D11::shutdown() {
 
     int r = 0;
     

@@ -54,10 +54,10 @@ namespace sc {
 
   /* ----------------------------------------------------------- */
 
-  class ScreenCaptureScaleAndColorTransformDirect3D11 {
+  class ScreenCaptureRendererDirect3D11 {
   public:
-    ScreenCaptureScaleAndColorTransformDirect3D11();
-    ~ScreenCaptureScaleAndColorTransformDirect3D11();
+    ScreenCaptureRendererDirect3D11();
+    ~ScreenCaptureRendererDirect3D11();
     int init(ScaleColorTransformSettingsD3D11 cfg);                      /* Initializes the scale/transform features; creates textures etc.. */
     int shutdown();                                                      /* Cleans up; sets the device and context members to NULL. */
     int scale(ID3D11Texture2D* tex);                                     /* Scale the given texture to the output_width and output_height of the settings passed into init(). */
@@ -90,15 +90,15 @@ namespace sc {
 
   /* ----------------------------------------------------------- */
 
-  inline int ScreenCaptureScaleAndColorTransformDirect3D11::isInit() {
+  inline int ScreenCaptureRendererDirect3D11::isInit() {
     return is_init;
   }
 
-  inline int ScreenCaptureScaleAndColorTransformDirect3D11::updatePointerPixels(int w, int h, uint8_t* pixels) {
+  inline int ScreenCaptureRendererDirect3D11::updatePointerPixels(int w, int h, uint8_t* pixels) {
     return pointer.updatePointerPixels(w, h, pixels);
   }
 
-  inline void ScreenCaptureScaleAndColorTransformDirect3D11::updatePointerPosition(float x, float y) {
+  inline void ScreenCaptureRendererDirect3D11::updatePointerPosition(float x, float y) {
     pointer.updatePointerPosition(x, y);
   }
   
