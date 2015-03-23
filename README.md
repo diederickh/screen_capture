@@ -30,7 +30,7 @@ test application that captures from the first display:
 
 ````sh
 cd build
-./release 64
+./release.sh 64
 ````
 
 ## Compiling on Windows
@@ -40,7 +40,7 @@ cmake and that you execute the following commands from a Git Bash.
 
 ````sh
 cd build
-./release 64
+./release.sh 64
 ````
 
 
