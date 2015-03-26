@@ -511,10 +511,13 @@ namespace sc {
     }
 #endif
 
-    /* When we have a new frame, make sure we set the correct upload state. */
-    if (true == has_new_frame) {
-      glBindTexture(GL_TEXTURE_2D, tex0);
-
+    /* Update the pixel data. */
+    /* @todo maybe we can profile if we should lock the `pixels` a bit shorter. */
+    lock();
+    {
+      if (true == has_new_frame) {
+        
+        /* When we have a new frame, make sure we set the correct upload state. */
         if (0 != unpack_row_length[0]) {
           glPixelStorei(GL_UNPACK_ROW_LENGTH, unpack_row_length[0]);
           changed_unpack = true;
@@ -524,23 +527,19 @@ namespace sc {
           glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
           changed_unpack = true;
         }
-    }
-            
-    /* Update the pixel data. */
-    lock();
-    {
-      if (true == has_new_frame) {
+
+        glBindTexture(GL_TEXTURE_2D, tex0);
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, settings.output_width,  settings.output_height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
         has_new_frame = false;
+
+        /* Reset unpack state. */
+        if (true == changed_unpack) {
+          glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+          glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+        }
       }
     }
     unlock();
-
-    /* Reset unpack state. */
-    if (true == changed_unpack) {
-      glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-      glPixelStorei(GL_UNPACK_ALIGNMENT, 0);
-    }
   }
 
   void ScreenCaptureGL::draw() {
