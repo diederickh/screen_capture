@@ -77,7 +77,7 @@ elseif(WIN32)
 endif()
 
 add_library(screencapture${debug_flag} ${screencapture_lib_sources})
-#install(TARGETS screencapture${debug_flag} ARCHIVE DESTINATION lib)
+install(TARGETS screencapture${debug_flag} ARCHIVE DESTINATION lib)
 
 macro(create_test name fname params)
   set(test_name "test_${name}${debug_flag}")

@@ -48,6 +48,15 @@
   -----
   See src/test_opengl.cpp
 
+
+  Note:
+  -----
+  I removed using a projection matrix + view matrix because it's easier to 
+  manager just a viewport and rendering a full-viewport triangle-strip to draw
+  the contents. This makes it easier to work with e.g. FBOs and RTT features.
+  See commit 877dda9005d0bcf793f600100eca7d75387948d4 for a version with 
+  projection- and view matrix.
+
 */
 /* --------------------------------------------------------------------------- */
 /*                               H E A D E R                                   */ 
@@ -75,22 +84,19 @@ namespace sc {
   
   static const char* SCREENCAPTURE_GL_VS = ""
     "#version 330\n"
-    "uniform mat4 u_pm;"
-    "uniform mat4 u_vm;"
     "uniform float u_texcoords[8]; "
     ""
-    "const vec2 pos[4] = vec2[4]("
-    "  vec2(0.0,  1.0), "
-    "  vec2(0.0,  0.0), "
-    "  vec2(1.0,  1.0), "
-    "  vec2(1.0,  0.0)  "
-    ");"
+    " const vec2[] pos = vec2[4]("
+    "   vec2(-1.0, 1.0),"
+    "   vec2(-1.0, -1.0),"
+    "   vec2(1.0, 1.0),"
+    "   vec2(1.0, -1.0)"
+    "   );"
     ""
     "out vec2 v_tex; "
     ""
     "void main() { "
-    "  gl_Position = u_pm * u_vm * vec4(pos[gl_VertexID], 0.0, 1.0);"
-    "  gl_Position.z = 1.0;" /* Make sure it's always drawn, @todo will be removed at some point. */
+    "  gl_Position = vec4(pos[gl_VertexID], 0.0, 1.0);"
     "  v_tex = vec2(u_texcoords[gl_VertexID * 2], u_texcoords[(gl_VertexID * 2) + 1]);"
     "}"
     "";
@@ -147,10 +153,8 @@ namespace sc {
     void draw();                                                                 /* Draw the captured screen using at 0, 0 using the provided output_width and output_height of the settings youpassed into configure.*/
     void draw(float x, float y, float w, float h);                               /* Draw the captured screen at the given location. */
     int flip(bool horizontal, bool vertical);                                    /* Flip the screen horizontally or vertically according to Photoshops flip feature. */
-
-    int setProjectionMatrix(float* projection);
-    int lock();                                                                 /* Whenever you want to access the `pixels` member you need to lock first. */
-    int unlock();                                                               /* Unlock when you're ready witht eh `pixels` member. */
+    int lock();                                                                  /* Whenever you want to access the `pixels` member you need to lock first. */
+    int unlock();                                                                /* Unlock when you're ready witht eh `pixels` member. */
     
   private:
     int setupGraphics();                                                         /* Used internally to create the shaders when they're not yet created, calls `setupShaders()` and `setupTextures()`. */
@@ -162,8 +166,6 @@ namespace sc {
     static GLuint vert;                                                          /* The vertex shader. Shared among all instances of `ScreenCapture` */
     static GLuint frag;                                                          /* The fragment shader. Shared among all instances of `ScreenCapture` */
     static GLuint vao;                                                           /* The vao we use for attributeless rendering. */
-    static GLint u_pm;                                                           /* Projection matrix uniform location. */
-    static GLint u_vm;                                                           /* View matrix uniform location. */
     static GLint u_texcoords;                                                    /* Texcoord uniform location; `flip()` uploads the correct texture coordinates. */
     static GLint u_tex;                                                          /* Texture uniform location. */ 
     ScreenMutex mutex;                                                           /* It's possible (and probably will be) that the received pixel buffers are passed to the frame callback from another thread so we need to sync access to it. */
@@ -172,9 +174,7 @@ namespace sc {
     uint8_t* pixels;                                                             /* The pixels we received in the frame callback. */
     bool has_new_frame;                                                          /* Is set to true when in the frame callback. When true, we will update the texture data. */
     GLuint tex0;                                                                 /* First plane, or the only tex when using GL_BGRA */
-    GLuint tex1;                                                                 /* Second plane, only used when we receive planar data. */  
-    float pm[16];                                                                /* The projection matrix. */
-    float vm[16];                                                                /* The view matrix. */
+    GLuint tex1;                                                                 /* Second plane, only used when we receive planar data. */
     int unpack_alignment[3];
     int unpack_row_length[3];
   };
@@ -209,28 +209,6 @@ namespace sc {
     return 0;
   }
 
-  inline int ScreenCaptureGL::setProjectionMatrix(float* projection) {
-
-#if !defined(NDEBUG)
-    if (0 == prog) {
-      printf("Error: can only set the projection matrix of the ScreenCaptureGL after it's initialized and configured.\n");
-      return -1;
-    }
-#endif    
-    
-    if (NULL == projection) {
-      printf("Error: trying to set the projection matrix, but you've passed a NULL pointer.\n");
-      return -2;
-    }
-
-    memcpy(pm, projection, sizeof(pm));
-
-    glUseProgram(prog);
-    glUniformMatrix4fv(u_pm, 1, GL_FALSE, pm);
-
-    return 0;
-  }
-
 } /* namespace sc */
 #endif
 
@@ -260,8 +238,6 @@ namespace sc {
   GLuint ScreenCaptureGL::vert = 0;
   GLuint ScreenCaptureGL::frag = 0;
   GLuint ScreenCaptureGL::vao = 0;
-  GLint ScreenCaptureGL::u_pm = -1;
-  GLint ScreenCaptureGL::u_vm = -1;
   GLint ScreenCaptureGL::u_texcoords = -1;
   GLint ScreenCaptureGL::u_tex = -1;
 
@@ -274,8 +250,6 @@ namespace sc {
     ,tex0(0)
     ,tex1(0)
   {
-    memset(pm, 0x00, sizeof(pm));
-    memset(vm, 0x00, sizeof(vm));
     memset(unpack_alignment, 0x00, sizeof(unpack_alignment));
     memset(unpack_row_length, 0x00, sizeof(unpack_row_length));
   }
@@ -350,19 +324,6 @@ namespace sc {
       pixels = NULL;
     }
 
-    /*
-    if (SC_BGRA == cfg.pixel_format) {
-      nbytes = cfg.output_width * cfg.output_height * 4;
-      pixels = new uint8_t[nbytes];
-      memset(pixels, 0x00, nbytes);
-    }
-    else {
-      printf("Error: unsupported pixel format in ScreenCaptureGL::configure: %s\n", screencapture_pixelformat_to_string(cfg.pixel_format).c_str());
-      return -3;
-    }
-    */
-
-    
     if (0 != setupGraphics()) {
       return -4;
     }
@@ -387,21 +348,19 @@ namespace sc {
     if (0 == vao) {
       glGenVertexArrays(1, &vao);
     }
-
-    create_identity_matrix(vm);
-
+    
     /* We should store the flip as state, not in the global shader. */
-    if (0 != flip(false, true)) {
+    if (0 != flip(false, false)) {
       /* @todo - we should remove all GL objects here. */
       return -3;
     }
-    
+
     return 0;
   }
 
   int ScreenCaptureGL::setupShaders() {
 
-    GLint vp[4] = { 0.0f };
+    GLint vp[4] = { 0 };
 
     if (0 != prog) {
       printf("Error: trying to setup shaders but the shader is already created.\n");
@@ -427,7 +386,7 @@ namespace sc {
     else {
       printf("Error: failed to create the shader; no supported shader found.\n");
       glDeleteShader(vert);
-      vert = -1;
+      vert = 0;
       return -4;
     }
 
@@ -435,28 +394,18 @@ namespace sc {
       printf("Error: failed to create the screencapture program.\n");
       glDeleteShader(vert);
       glDeleteShader(frag);
-      vert = -1;
-      frag = -1;
+      vert = 0;
+      frag = 0;
       return -5;
     }
 
     glUseProgram(prog);
 
-    u_pm = glGetUniformLocation(prog, "u_pm");
-    u_vm = glGetUniformLocation(prog, "u_vm");
     u_texcoords = glGetUniformLocation(prog, "u_texcoords");
     u_tex = glGetUniformLocation(prog, "u_tex");
 
-    assert(-1 != u_pm);
-    assert(-1 != u_vm);
     assert(-1 != u_texcoords);
     assert(-1 != u_tex);
-
-    glGetIntegerv(GL_VIEWPORT, vp);
-    create_ortho_matrix(0.0f, vp[2], vp[3], 0.0f, 0.0f, 100.0f, pm);
-
-    glUniformMatrix4fv(u_pm, 1, GL_FALSE, pm);
-    glUniform1i(u_tex, 0);
     
     return 0;
   }
@@ -564,17 +513,12 @@ namespace sc {
       printf("Error: cannot bind texture for the current pixel format. %s\n", screencapture_pixelformat_to_string(settings.pixel_format).c_str());
       return;
     }
-   
-    /* Update the view matrix. */
-    vm[0] = w;
-    vm[5] = h;
-    vm[12] = x;
-    vm[13] = y;
+
+    glViewport(x, y, w, h);
 
     /* And draw. */
     glUseProgram(prog);
     glBindVertexArray(vao);
-    glUniformMatrix4fv(u_vm, 1, GL_FALSE, vm);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
   }
 
@@ -853,3 +797,5 @@ namespace sc {
 } /* namespace sc */
 
 #endif
+
+#undef SCREEN_CAPTURE_IMPLEMENTATION

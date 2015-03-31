@@ -16,18 +16,6 @@ namespace sc {
     m[11] = 0.0f;
     m[15] = 1.0f;
 
-#if 0
-    float rml = r - l;
-    float fmn = f - n;
-    float tmb = t - b;
-
-    m[0]  = 2.0f / rml;
-    m[5]  = 2.0f / tmb;
-    m[10] = -2.0f / fmn;
-    m[12] = -(r + l) / rml;
-    m[13] = -(t + b) / tmb;
-    m[14] = -(f + n) / fmn;
-#else
     float invrl = (r != l) ? 1.0f / (r - l) : 0.0f;
     float invtb = (t != b) ? 1.0f / (t - b) : 0.0f;
     float invfn = (f != n) ? 1.0f / (f - n) : 0.0f;
@@ -40,7 +28,6 @@ namespace sc {
     m[13] = -(t + b) * invtb;
     m[14] = -(f + n) * invfn;
     m[15] = 1.0f;
-#endif
   }
 
   void create_translation_matrix(float x, float y, float z, float* m) {
