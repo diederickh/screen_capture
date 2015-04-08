@@ -306,8 +306,6 @@ namespace sc {
 
   int ScreenCaptureGL::configure(Settings cfg) {
 
-    size_t nbytes = 0;
-
     settings = cfg;
 
     if (SC_BGRA != cfg.pixel_format) {
@@ -360,9 +358,7 @@ namespace sc {
 
   int ScreenCaptureGL::setupShaders() {
 
-    GLint vp[4] = { 0 };
-
-    if (0 != prog) {
+     if (0 != prog) {
       printf("Error: trying to setup shaders but the shader is already created.\n");
       return -1;
     }
