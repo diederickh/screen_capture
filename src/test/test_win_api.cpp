@@ -20,8 +20,6 @@
 #include <windows.h>
 #include <screencapture/ScreenCapture.h>
 
-
-
 /* ------------------------------------------------------------------------------------------------ */
 static void frame_callback(sc::PixelBuffer& buf);
 LRESULT CALLBACK WindowProc(HWND wnd, UINT msg, WPARAM wparam, LPARAM lparam);

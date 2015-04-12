@@ -40,7 +40,7 @@
 
    And in one .cpp file you need to do:
    
-         #define SCREEN_CAPUTRE_IMPLEMENTATION
+         #define SCREEN_CAPTURE_IMPLEMENTATION
          #include <screencapture/ScreenCaptureGL.h>
 
 
