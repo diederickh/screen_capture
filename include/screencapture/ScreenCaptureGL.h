@@ -268,7 +268,7 @@ namespace sc {
     if (0 != cap.init()) {
       return -1;
     }
-    
+
     return 0;
   }
 

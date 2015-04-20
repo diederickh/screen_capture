@@ -97,6 +97,7 @@ namespace sc {
     
       while (DXGI_ERROR_NOT_FOUND != adapter->EnumOutputs(dx, &output)) {
         outputs.push_back(output);
+
         ++dx;
       }
     }
@@ -609,6 +610,8 @@ namespace sc {
   }
 
   int ScreenCaptureDuplicateOutputDirect3D11::getDisplays(std::vector<Display*>& result) {
+    printf("Get displays. we have: %lu\n", displays.size());
+    result = displays;
     return 0;
   }
 
