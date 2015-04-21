@@ -403,8 +403,8 @@ namespace sc {
       }
     }
 
-    /* Acquire a new frame. */
-    hr = duplication->AcquireNextFrame(100, &frame_info, &frame);
+    /* Acquire a new frame, and directly return (0) when there is no new one. */
+    hr = duplication->AcquireNextFrame(0, &frame_info, &frame);
 
     if (S_OK == hr) {
 
